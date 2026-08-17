@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dror\'s Portal</string>
+    <string name="config_title">Widget data feeds</string>
+    <string name="config_hint">Base URL of the portal JSON feeds (news.json, stocks.json, shopping.json). Leave empty to use the widget as launcher shortcuts only.</string>
+    <string name="config_save">Save</string>
+    <string name="config_skip">Skip — shortcuts only</string>
+</resources>

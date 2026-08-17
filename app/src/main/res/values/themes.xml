@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.DrorPortal" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#1B5E46</item>
+        <item name="colorSecondary">#4ECF9D</item>
+    </style>
+</resources>

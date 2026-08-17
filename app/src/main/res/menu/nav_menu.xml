@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/tab_portal" android:title="Portal" android:icon="@android:drawable/ic_menu_compass" />
+    <item android:id="@+id/tab_edition" android:title="Edition" android:icon="@android:drawable/ic_menu_agenda" />
+    <item android:id="@+id/tab_scan" android:title="Scan" android:icon="@android:drawable/ic_menu_search" />
+    <item android:id="@+id/tab_deals" android:title="Deals" android:icon="@android:drawable/ic_menu_gallery" />
+</menu>
