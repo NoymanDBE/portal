@@ -16,7 +16,7 @@ object FeedStore {
         val updated: String,
     )
 
-    /** "owner/repo" of the (private) GitHub repo holding feeds/*.json */
+    /** "owner/repo" of the (private) GitHub repo holding the feed JSON files */
     fun repoSpec(context: Context): String? =
         context.getSharedPreferences(PREFS, 0).getString("feed_repo", null)
             ?.trim()?.trim('/')?.takeIf { it.matches(Regex("[\\w.-]+/[\\w.-]+")) }
