@@ -26,7 +26,8 @@ textarea:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--acce
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
 /* ---- unlock ceremony ---- */
-#gate{position:fixed;inset:0;background:var(--bg-0);display:flex;align-items:center;justify-content:center;padding:24px}
+#gate{position:fixed;inset:0;z-index:50;background:var(--bg-0);display:flex;align-items:center;justify-content:center;padding:24px}
+#gate[hidden],#app[hidden]{display:none !important}
 .gate-in{width:100%;max-width:460px;text-align:center}
 .wordmark{font:700 15px/1 var(--sans);letter-spacing:.42em;color:var(--text-1)}
 .gate-date{font:12px var(--sans);color:var(--text-3);margin-top:10px;letter-spacing:.08em}
