@@ -1,0 +1,10 @@
+{
+  "name": "Dror's Portal",
+  "short_name": "Portal",
+  "start_url": "./#/home",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#08090A",
+  "theme_color": "#08090A",
+  "icons": []
+}

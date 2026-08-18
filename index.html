@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<title>Dror's Portal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<div id="gate" hidden>
+  <div class="gate-in">
+    <div class="wordmark">DROR'S&nbsp;PORTAL</div>
+    <div class="gate-date" id="gate-date"></div>
+    <div class="gate-card" id="gate-card">
+      <p class="gate-lead">This edition is encrypted for you.</p>
+      <p class="gate-sub">Paste your key to open it.</p>
+      <textarea id="key-input" spellcheck="false" autocomplete="off"
+        placeholder='{"kty":"RSA", …} — from your Key Card'></textarea>
+      <button class="btn" id="unlock-btn">Unlock</button>
+      <p class="gate-err" id="gate-err" role="alert"></p>
+    </div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="top-in">
+      <a class="mark" href="#/home">DROR'S&nbsp;PORTAL</a>
+      <span class="fresh" id="freshline"></span>
+      <button class="tbtn" id="theme-btn" aria-label="Theme">◐</button>
+    </div>
+    <nav class="tabs" id="tabs">
+      <a href="#/home" data-r="home">Home</a>
+      <a href="#/news" data-r="news">Morning News</a>
+      <a href="#/stocks" data-r="stocks">Stock Screener</a>
+      <a href="#/shopping" data-r="shopping">Shopping Scout</a>
+    </nav>
+  </header>
+  <main id="view" class="view"></main>
+  <footer class="foot">Encrypted end-to-end — content readable only with your key. Generated daily by your research jobs.</footer>
+</div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>
