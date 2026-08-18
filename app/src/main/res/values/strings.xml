@@ -2,7 +2,8 @@
 <resources>
     <string name="app_name">Dror\'s Portal</string>
     <string name="config_title">Widget data feeds</string>
-    <string name="config_hint">Base URL of the portal JSON feeds (news.json, stocks.json, shopping.json). Leave empty to use the widget as launcher shortcuts only.</string>
+    <string name="config_hint">Your GitHub repo (owner/name) and a read-only access token so the widget can read the private feeds. Leave empty to use the widget as launcher shortcuts only.</string>
+    <string name="config_token_hint">GitHub access token (read-only)</string>
     <string name="config_save">Save</string>
     <string name="config_skip">Skip — shortcuts only</string>
 </resources>

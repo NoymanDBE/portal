@@ -19,12 +19,20 @@
         android:text="@string/config_hint" />
 
     <EditText
-        android:id="@+id/feed_url"
+        android:id="@+id/feed_repo"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:hint="https://raw.githubusercontent.com/USER/REPO/main/feeds"
+        android:hint="NoymanDBE/portal"
         android:inputType="textUri" />
+
+    <EditText
+        android:id="@+id/feed_token"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="@string/config_token_hint"
+        android:inputType="textPassword" />
 
     <Button
         android:id="@+id/save"

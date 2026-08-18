@@ -9,28 +9,35 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Pulls the three feed JSONs and re-renders every widget. */
+/**
+ * Pulls the three feed JSONs through the GitHub contents API (works for a
+ * PRIVATE repo when a read-only token is configured) and re-renders widgets.
+ */
 class FeedWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params) {
 
     override fun doWork(): Result {
-        val base = FeedStore.baseUrl(applicationContext) ?: run {
+        val repo = FeedStore.repoSpec(applicationContext) ?: run {
             PortalWidget.renderAll(applicationContext, FeedStore.unconfigured())
             return Result.success()
         }
-        val news = fetch("$base/news.json")
-        val stocks = fetch("$base/stocks.json")
-        val deals = fetch("$base/shopping.json")
-        val snap = FeedStore.build(applicationContext, news, stocks, deals)
+        val token = FeedStore.token(applicationContext)
+        val news = fetch(repo, "news.json", token)
+        val stocks = fetch(repo, "stocks.json", token)
+        val deals = fetch(repo, "shopping.json", token)
+        val snap = FeedStore.build(news, stocks, deals)
         FeedStore.save(applicationContext, snap)
         PortalWidget.renderAll(applicationContext, snap)
         return Result.success()
     }
 
-    private fun fetch(url: String): JSONObject? = try {
+    private fun fetch(repo: String, name: String, token: String?): JSONObject? = try {
+        val url = "https://api.github.com/repos/$repo/contents/feeds/$name"
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 10000
         conn.readTimeout = 10000
-        conn.setRequestProperty("Cache-Control", "no-cache")
+        conn.setRequestProperty("Accept", "application/vnd.github.raw+json")
+        conn.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+        if (!token.isNullOrEmpty()) conn.setRequestProperty("Authorization", "Bearer $token")
         val text = conn.inputStream.bufferedReader().readText()
         JSONObject(text)
     } catch (e: Exception) {

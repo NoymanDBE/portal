@@ -16,20 +16,30 @@ object FeedStore {
         val updated: String,
     )
 
-    fun baseUrl(context: Context): String? =
-        context.getSharedPreferences(PREFS, 0).getString("feed_base", null)?.trimEnd('/')
+    /** "owner/repo" of the (private) GitHub repo holding feeds/*.json */
+    fun repoSpec(context: Context): String? =
+        context.getSharedPreferences(PREFS, 0).getString("feed_repo", null)
+            ?.trim()?.trim('/')?.takeIf { it.matches(Regex("[\\w.-]+/[\\w.-]+")) }
 
-    fun setBaseUrl(context: Context, url: String) =
-        context.getSharedPreferences(PREFS, 0).edit().putString("feed_base", url.trim()).apply()
+    /** fine-grained GitHub token with read-only Contents access to that repo */
+    fun token(context: Context): String? =
+        context.getSharedPreferences(PREFS, 0).getString("feed_token", null)
+            ?.trim()?.takeIf { it.isNotEmpty() }
+
+    fun setConfig(context: Context, repo: String, token: String) =
+        context.getSharedPreferences(PREFS, 0).edit()
+            .putString("feed_repo", repo.trim())
+            .putString("feed_token", token.trim())
+            .apply()
 
     fun unconfigured() = Snapshot(
         "Tap to open The Edition",
         "Tap to open Breakthrough Scan",
         "Tap to open Deal Hunter",
-        "Feeds not configured — long-press widget → reconfigure",
+        "Feeds not configured — re-add the widget to set them up",
     )
 
-    fun build(context: Context, news: JSONObject?, stocks: JSONObject?, deals: JSONObject?): Snapshot {
+    fun build(news: JSONObject?, stocks: JSONObject?, deals: JSONObject?): Snapshot {
         val newsLine = news?.optString("headline")?.takeIf { it.isNotBlank() }
             ?.let { "📰 $it" } ?: "📰 The Edition"
         val stocksLine = stocks?.optString("line")?.takeIf { it.isNotBlank() }
@@ -58,7 +68,7 @@ object FeedStore {
 
     fun cached(context: Context): Snapshot {
         val p = context.getSharedPreferences(PREFS, 0)
-        if (baseUrl(context) == null) return unconfigured()
+        if (repoSpec(context) == null) return unconfigured()
         return Snapshot(
             p.getString("c_news", "📰 The Edition")!!,
             p.getString("c_stocks", "🔬 Breakthrough Scan")!!,

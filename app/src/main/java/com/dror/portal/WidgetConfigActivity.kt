@@ -7,7 +7,7 @@ import android.widget.Button
 import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
 
-/** Asked once when the widget is added: the base URL of the JSON feeds. */
+/** Asked once when the widget is added: the private repo and its read token. */
 class WidgetConfigActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,12 +19,15 @@ class WidgetConfigActivity : AppCompatActivity() {
             AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
-        val input = findViewById<EditText>(R.id.feed_url)
-        FeedStore.baseUrl(this)?.let { input.setText(it) }
+        val repoInput = findViewById<EditText>(R.id.feed_repo)
+        val tokenInput = findViewById<EditText>(R.id.feed_token)
+        FeedStore.repoSpec(this)?.let { repoInput.setText(it) }
+        FeedStore.token(this)?.let { tokenInput.setText(it) }
 
         findViewById<Button>(R.id.save).setOnClickListener {
-            val url = input.text.toString().trim()
-            if (url.isNotEmpty()) FeedStore.setBaseUrl(this, url)
+            val repo = repoInput.text.toString().trim()
+            val token = tokenInput.text.toString().trim()
+            if (repo.isNotEmpty()) FeedStore.setConfig(this, repo, token)
             PortalWidget.render(
                 this, AppWidgetManager.getInstance(this), widgetId, FeedStore.cached(this)
             )
