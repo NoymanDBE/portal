@@ -15,7 +15,22 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        create("stable") {
+            // Generated once by CI and committed to this private repo so every
+            // build carries the same signature and updates install in place.
+            storeFile = rootProject.file("keystore.jks")
+            storePassword = "portal-debug"
+            keyAlias = "portal"
+            keyPassword = "portal-debug"
+        }
+    }
     buildTypes {
+        getByName("debug") {
+            if (rootProject.file("keystore.jks").exists()) {
+                signingConfig = signingConfigs.getByName("stable")
+            }
+        }
         release {
             isMinifyEnabled = false
         }

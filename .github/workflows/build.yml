@@ -24,6 +24,20 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Ensure persistent signing keystore
+        run: |
+          if [ ! -f keystore.jks ]; then
+            keytool -genkeypair -v -keystore keystore.jks -alias portal \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass portal-debug -keypass portal-debug \
+              -dname "CN=Dror Portal"
+            git config user.name "portal-ci"
+            git config user.email "ci@users.noreply.github.com"
+            git add keystore.jks
+            git commit -m "CI: persistent signing keystore [skip ci]"
+            git push
+          fi
+
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
