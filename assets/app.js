@@ -152,8 +152,86 @@ function route() {
   });
   var v = $('view');
   if (r === 'home') { v.innerHTML = homeHTML(state.content.home); return; }
+  if (r === 'news') {
+    if (state.content.news) { v.innerHTML = newsHTML(state.content.news); return; }
+    v.innerHTML = '<div class="placeholder"><div class="b">Decrypting today’s edition…</div></div>';
+    loadBlob('news').then(function () {
+      if ((location.hash.replace('#/', '') || 'home').split('/')[0] === 'news') v.innerHTML = newsHTML(state.content.news);
+    }).catch(function () {
+      v.innerHTML = '<div class="placeholder"><div class="a">No edition yet.</div><div class="b">The presses run at 04:50.</div></div>';
+    });
+    return;
+  }
   v.innerHTML = '<div class="placeholder"><div class="a">' + NAMES[r] + '</div>' +
-    '<div class="b">This section arrives in ' + ({ news: 'Phase 2', stocks: 'Phase 3', shopping: 'Phase 4' })[r] + ' — the pipeline behind it is already being wired.</div></div>';
+    '<div class="b">This section arrives in ' + ({ stocks: 'Phase 3', shopping: 'Phase 4' })[r] + ' — the pipeline behind it is already being wired.</div></div>';
+}
+
+/* ---------- Morning News ---------- */
+function paras(t) {
+  return String(t || '').split(/\n\n+/).map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('');
+}
+function storyHTML(st, secId, groupTitle) {
+  var badges = '';
+  if (st.disp) badges += '<span class="nbadge contested">CONTESTED</span>';
+  if (secId === 'med' && /ophthalm/i.test(groupTitle || '')) badges += '<span class="nbadge spec">SPECIALIST</span>';
+  var conf = (st.conf || []).map(function (c) {
+    return '<div class="readrow"><span class="pct num">' + esc(c.p) + '%</span><div><div class="claim">' + esc(c.c) + '</div>' +
+      (c.w ? '<div class="why">' + esc(c.w) + '</div>' : '') + '</div></div>';
+  }).join('');
+  var srcs = st.src || [];
+  return '<details class="nstory">' +
+    '<summary><h3>' + esc(st.h) + '</h3>' + badges +
+    '<div class="blbox"><span class="bl-l">Bottom line</span>' + esc(st.bl) + '</div></summary>' +
+    '<div class="nbody">' +
+    '<div class="nlabel">THE FACTS</div>' + paras(st.body) +
+    (conf ? '<div class="nlabel">OUR READ</div>' + conf : '') +
+    (st.disp ? '<div class="nlabel dis">ROOM FOR DISAGREEMENT</div><div class="dispbox">' + paras(st.disp) + '</div>' : '') +
+    (srcs.length ? '<details class="allsrc"><summary>ALL SOURCES (' + srcs.length + ')</summary><div class="srclist">' + srcs.map(esc).join(' · ') + '</div></details>' : '') +
+    '</div></details>';
+}
+function newsHTML(n) {
+  var out = '<article class="paper">';
+  out += '<div class="edline">' + esc(n.edition_line || '') + '</div>';
+  out += '<div class="nlead">' + esc(n.lead || '') + '</div>';
+  if ((n.keys || []).length) {
+    out += '<div class="keysbox"><div class="nlabel">THE KEY POINTS</div><ul>' +
+      n.keys.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></div>';
+  }
+  if ((n.markets || []).length) {
+    out += '<div class="mstrip">' + n.markets.map(function (m) {
+      var dir = /^-|down/i.test(m.c || '') ? 'dn' : (/^\+|up/i.test(m.c || '') ? 'up' : '');
+      return '<span class="mq"><span class="mn">' + esc(m.n) + '</span><span class="mv num">' + esc(m.v) + '</span><span class="mc num ' + dir + '">' + esc(m.c) + '</span></span>';
+    }).join('') + '</div>';
+    if (n.mktNote) out += '<details class="mnote"><summary>About these numbers</summary><p>' + esc(n.mktNote) + '</p></details>';
+  }
+  var secs = n.sections || [];
+  out += '<nav class="ribbon">' + secs.map(function (s) {
+    var count = (s.groups || []).reduce(function (a, g) { return a + (g.stories || []).length; }, 0);
+    return '<a href="#sec-' + esc(s.id) + '">' + esc(s.label) + ' <span class="num">' + count + '</span></a>';
+  }).join('') + '</nav>';
+  secs.forEach(function (s) {
+    out += '<section class="nsec" id="sec-' + esc(s.id) + '"><h2>' + esc(s.label) + '</h2>';
+    if ((s.bl || []).length) {
+      out += '<div class="secbl"><ul>' + s.bl.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></div>';
+    }
+    (s.groups || []).forEach(function (g) {
+      if (g.title) out += '<div class="ngroup"><span>' + esc(g.title) + '</span></div>';
+      out += (g.stories || []).map(function (st) { return storyHTML(st, s.id, g.title); }).join('');
+    });
+    out += '</section>';
+  });
+  if ((n.brief || []).length) {
+    out += '<section class="nsec"><h2>In one line</h2><ul class="briefs">' +
+      n.brief.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></section>';
+  }
+  if ((n.archive || []).length) {
+    out += '<details class="allsrc arch"><summary>PAST EDITIONS (' + n.archive.length + ')</summary>' +
+      n.archive.map(function (d) {
+        return '<div class="archday"><b>' + esc(d.d) + '</b><ul>' + (d.top || []).map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ul></div>';
+      }).join('') + '</details>';
+  }
+  out += '<div class="caughtup">You’re caught up. Next edition ~04:50.</div></article>';
+  return out;
 }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function homeHTML(h) {
