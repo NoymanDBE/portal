@@ -97,7 +97,9 @@ function gateError(e) {
 }
 function showGate() {
   $('app').hidden = true;
+  $('app').style.display = 'none';
   $('gate').hidden = false;
+  $('gate').style.display = 'flex';
   var d = new Date();
   $('gate-date').textContent = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase();
 }
@@ -172,7 +174,9 @@ function mod(slug, name, desc, phase) {
 }
 function enter() {
   $('gate').hidden = true;
+  $('gate').style.display = 'none';
   $('app').hidden = false;
+  $('app').style.display = '';
   var m = state.manifest || {};
   $('freshline').textContent = m.generated_at ? 'Generated ' + m.generated_at : '';
   route();
