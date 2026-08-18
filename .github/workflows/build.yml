@@ -29,18 +29,17 @@ jobs:
         with:
           gradle-version: "8.9"
 
-      - name: Ensure persistent signing keystore
+      - name: Restore signing keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
-          if [ ! -f keystore.jks ]; then
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > keystore.jks
+          else
             keytool -genkeypair -v -keystore keystore.jks -alias portal \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass portal-debug -keypass portal-debug \
               -dname "CN=Dror Portal"
-            git config user.name "portal-ci"
-            git config user.email "ci@users.noreply.github.com"
-            git add keystore.jks
-            git commit -m "CI: persistent signing keystore [skip ci]"
-            git push
           fi
 
       - name: Build debug APK
