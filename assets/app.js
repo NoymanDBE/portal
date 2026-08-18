@@ -144,26 +144,32 @@ function tryStoredKey() {
 
 /* ---------- views ---------- */
 var NAMES = { home: 'Home', news: "Dror's Morning News", stocks: "Dror's Stock Screener", shopping: "Dror's Shopping Scout" };
-function route() {
-  var r = (location.hash.replace('#/', '') || 'home').split('/')[0];
+function parseRoute() {
+  var parts = (location.hash.replace(/^#\/?/, '') || 'home').split('/');
+  var r = parts[0] || 'home';
   if (!NAMES[r]) r = 'home';
+  return { r: r, sub: parts.slice(1).join('/') };
+}
+function route() {
+  var cur = parseRoute();
   document.querySelectorAll('.tabs a').forEach(function (a) {
-    a.classList.toggle('on', a.getAttribute('data-r') === r);
+    a.classList.toggle('on', a.getAttribute('data-r') === cur.r);
   });
   var v = $('view');
-  if (r === 'home') { v.innerHTML = homeHTML(state.content.home); return; }
-  if (r === 'news') {
-    if (state.content.news) { v.innerHTML = newsHTML(state.content.news); return; }
+  if (cur.r === 'home') { v.innerHTML = homeHTML(state.content.home); return; }
+  if (cur.r === 'news') {
+    if (state.content.news) { v.innerHTML = newsHTML(state.content.news, cur.sub); return; }
     v.innerHTML = '<div class="placeholder"><div class="b">Decrypting today’s edition…</div></div>';
     loadBlob('news').then(function () {
-      if ((location.hash.replace('#/', '') || 'home').split('/')[0] === 'news') v.innerHTML = newsHTML(state.content.news);
+      var now = parseRoute();
+      if (now.r === 'news') v.innerHTML = newsHTML(state.content.news, now.sub);
     }).catch(function () {
       v.innerHTML = '<div class="placeholder"><div class="a">No edition yet.</div><div class="b">The presses run at 04:50.</div></div>';
     });
     return;
   }
-  v.innerHTML = '<div class="placeholder"><div class="a">' + NAMES[r] + '</div>' +
-    '<div class="b">This section arrives in ' + ({ stocks: 'Phase 3', shopping: 'Phase 4' })[r] + ' — the pipeline behind it is already being wired.</div></div>';
+  v.innerHTML = '<div class="placeholder"><div class="a">' + NAMES[cur.r] + '</div>' +
+    '<div class="b">This section arrives in ' + ({ stocks: 'Phase 3', shopping: 'Phase 4' })[cur.r] + ' — the pipeline behind it is already being wired.</div></div>';
 }
 
 /* ---------- Morning News ---------- */
@@ -189,49 +195,73 @@ function storyHTML(st, secId, groupTitle) {
     (srcs.length ? '<details class="allsrc"><summary>ALL SOURCES (' + srcs.length + ')</summary><div class="srclist">' + srcs.map(esc).join(' · ') + '</div></details>' : '') +
     '</div></details>';
 }
-function newsHTML(n) {
-  var out = '<article class="paper">';
-  out += '<div class="edline">' + esc(n.edition_line || '') + '</div>';
-  out += '<div class="nlead">' + esc(n.lead || '') + '</div>';
-  if ((n.keys || []).length) {
-    out += '<div class="keysbox"><div class="nlabel">THE KEY POINTS</div><ul>' +
-      n.keys.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></div>';
-  }
-  if ((n.markets || []).length) {
-    out += '<div class="mstrip">' + n.markets.map(function (m) {
-      var dir = /^-|down/i.test(m.c || '') ? 'dn' : (/^\+|up/i.test(m.c || '') ? 'up' : '');
-      return '<span class="mq"><span class="mn">' + esc(m.n) + '</span><span class="mv num">' + esc(m.v) + '</span><span class="mc num ' + dir + '">' + esc(m.c) + '</span></span>';
-    }).join('') + '</div>';
-    if (n.mktNote) out += '<details class="mnote"><summary>About these numbers</summary><p>' + esc(n.mktNote) + '</p></details>';
-  }
+function secCount(s) {
+  return (s.groups || []).reduce(function (a, g) { return a + (g.stories || []).length; }, 0);
+}
+function newsSubtabs(n, sub) {
   var secs = n.sections || [];
-  out += '<nav class="ribbon">' + secs.map(function (s) {
-    var count = (s.groups || []).reduce(function (a, g) { return a + (g.stories || []).length; }, 0);
-    return '<a href="#sec-' + esc(s.id) + '">' + esc(s.label) + ' <span class="num">' + count + '</span></a>';
-  }).join('') + '</nav>';
-  secs.forEach(function (s) {
-    out += '<section class="nsec" id="sec-' + esc(s.id) + '"><h2>' + esc(s.label) + '</h2>';
-    if ((s.bl || []).length) {
-      out += '<div class="secbl"><ul>' + s.bl.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></div>';
-    }
-    (s.groups || []).forEach(function (g) {
-      if (g.title) out += '<div class="ngroup"><span>' + esc(g.title) + '</span></div>';
-      out += (g.stories || []).map(function (st) { return storyHTML(st, s.id, g.title); }).join('');
-    });
-    out += '</section>';
-  });
-  if ((n.brief || []).length) {
-    out += '<section class="nsec"><h2>In one line</h2><ul class="briefs">' +
-      n.brief.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></section>';
+  function tab(id, label, cnt) {
+    var href = '#/news' + (id ? '/' + id : '');
+    return '<a href="' + href + '"' + (sub === id ? ' class="on"' : '') + '>' + esc(label) +
+      (cnt != null ? ' <span class="num">' + cnt + '</span>' : '') + '</a>';
   }
+  return '<nav class="subtabs">' + tab('', 'Overview') +
+    secs.map(function (s) { return tab(s.id, s.label, secCount(s)); }).join('') +
+    tab('markets', 'Markets') + tab('briefs', 'Briefs') + '</nav>';
+}
+function newsOverviewHTML(n) {
+  var out = '<div class="nlabel">THE KEY POINTS</div>';
+  out += '<ul class="keypts">' + (n.keys || []).map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul>';
+  out += '<div class="ovhint">Everything else lives in the section tabs above.</div>';
+  return out;
+}
+function newsSectionHTML(s) {
+  var out = '';
+  if ((s.bl || []).length) {
+    out += '<div class="nlabel">THE BOTTOM LINES</div><div class="secbl"><ul>' +
+      s.bl.map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul></div>';
+  }
+  (s.groups || []).forEach(function (g) {
+    if (g.title) out += '<div class="ngroup"><span>' + esc(g.title) + '</span></div>';
+    out += (g.stories || []).map(function (st) { return storyHTML(st, s.id, g.title); }).join('');
+  });
+  return out;
+}
+function newsMarketsHTML(n) {
+  var out = '<div class="nlabel">MARKETS</div><div class="mtable">';
+  out += (n.markets || []).map(function (m) {
+    var dir = /^-|down/i.test(m.c || '') ? 'dn' : (/^\+|up/i.test(m.c || '') ? 'up' : '');
+    return '<div class="mrow"><span class="mrn">' + esc(m.n) + '</span><span class="mrv num">' + esc(m.v) + '</span>' +
+      '<span class="mrc num ' + dir + '">' + esc(m.c) + '</span><span class="mrd num">' + esc(m.d || '') + '</span></div>';
+  }).join('');
+  out += '</div>';
+  if (n.mktNote) out += '<div class="nlabel">ABOUT THESE NUMBERS</div><p class="mnotep">' + esc(n.mktNote) + '</p>';
+  return out;
+}
+function newsBriefsHTML(n) {
+  var out = '<div class="nlabel">IN ONE LINE</div><ul class="briefs">' +
+    (n.brief || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul>';
   if ((n.archive || []).length) {
     out += '<details class="allsrc arch"><summary>PAST EDITIONS (' + n.archive.length + ')</summary>' +
       n.archive.map(function (d) {
         return '<div class="archday"><b>' + esc(d.d) + '</b><ul>' + (d.top || []).map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ul></div>';
       }).join('') + '</details>';
   }
-  out += '<div class="caughtup">You’re caught up. Next edition ~04:50.</div></article>';
+  out += '<div class="caughtup">You’re caught up. Next edition ~04:50.</div>';
   return out;
+}
+function newsHTML(n, sub) {
+  var secs = n.sections || [];
+  var known = { '': 1, markets: 1, briefs: 1 };
+  secs.forEach(function (s) { known[s.id] = 1; });
+  if (!known[sub]) sub = '';
+  var body;
+  if (sub === '') body = newsOverviewHTML(n);
+  else if (sub === 'markets') body = newsMarketsHTML(n);
+  else if (sub === 'briefs') body = newsBriefsHTML(n);
+  else body = newsSectionHTML(secs.filter(function (s) { return s.id === sub; })[0]);
+  return '<article class="paper"><div class="edline">' + esc(n.edition_line || '') + '</div>' +
+    newsSubtabs(n, sub) + body + '</article>';
 }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function homeHTML(h) {
