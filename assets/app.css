@@ -78,8 +78,9 @@ textarea:focus,button:focus-visible,a:focus-visible,summary:focus-visible{outlin
 .paper{max-width:680px;margin:0 auto}
 .nlabel{font:600 11px/1 var(--sans);letter-spacing:.14em;color:var(--news);margin:24px 0 10px}
 .nlabel.dis{color:var(--warn)}
-.subtabs{position:sticky;top:var(--header-h);z-index:10;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:12px 0;margin-top:6px;background:color-mix(in srgb,var(--bg-0) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--hair);scroll-snap-type:x proximity;scroll-padding-inline:2px}
+.subtabs{position:sticky;top:var(--header-h);z-index:10;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:12px 0;margin-top:6px;background:color-mix(in srgb,var(--bg-0) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--hair);scroll-snap-type:x proximity;scroll-padding-inline:2px;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 36px),transparent)}
 .subtabs::-webkit-scrollbar{display:none}
+@media (min-width:640px){.subtabs{flex-wrap:wrap;overflow-x:visible;-webkit-mask-image:none;mask-image:none}}
 .subtabs a{flex:0 0 auto;scroll-snap-align:start;background:var(--bg-2);color:var(--text-2);font-size:12.5px;font-weight:500;border-radius:999px;padding:8px 14px;white-space:nowrap}
 .subtabs a .num{opacity:.6;font-size:11px}
 .subtabs a.on{background:var(--news);color:var(--accent-ink);font-weight:600}
