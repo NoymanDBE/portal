@@ -185,10 +185,14 @@ function storyHTML(st, secId, groupTitle) {
       (c.w ? '<div class="why">' + esc(c.w) + '</div>' : '') + '</div></div>';
   }).join('');
   var srcs = st.src || [];
+  var img = (st.img && /^https:\/\//.test(st.img.u || '')) ? st.img : null;
+  var thumb = img ? '<img class="thumb" src="' + esc(img.u) + '" alt="" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display=\'none\'">' : '';
+  var fig = img ? '<figure class="nfig"><img src="' + esc(img.u) + '" alt="' + esc(img.cap || '') + '" referrerpolicy="no-referrer" loading="lazy" onerror="this.parentNode.style.display=\'none\'">' +
+    '<figcaption>' + esc(img.cap || '') + (img.credit ? '<span class="cr">' + esc(img.credit) + '</span>' : '') + '</figcaption></figure>' : '';
   return '<details class="nstory">' +
-    '<summary><h3>' + esc(st.h) + '</h3>' + badges +
+    '<summary><div class="hwrap"><h3>' + esc(st.h) + '</h3>' + badges + '</div>' + thumb +
     '<div class="blbox"><span class="bl-l">Bottom line</span>' + esc(st.bl) + '</div></summary>' +
-    '<div class="nbody">' +
+    '<div class="nbody">' + fig +
     '<div class="nlabel">THE FACTS</div>' + paras(st.body) +
     (conf ? '<div class="nlabel">OUR READ</div>' + conf : '') +
     (st.disp ? '<div class="nlabel dis">ROOM FOR DISAGREEMENT</div><div class="dispbox">' + paras(st.disp) + '</div>' : '') +
