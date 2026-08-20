@@ -194,22 +194,53 @@ function route() {
 }
 
 /* ---------- Shopping Scout ---------- */
-function shopCard(it) {
+function savedStore() {
+  try { return JSON.parse(localStorage.getItem('shop_saved_v1') || '{}'); } catch (e) { return {}; }
+}
+function setSavedStore(s) {
+  try { localStorage.setItem('shop_saved_v1', JSON.stringify(s)); } catch (e) {}
+}
+function toggleSaved(id) {
+  var s = savedStore();
+  if (s[id]) { delete s[id]; } else {
+    var items = (state.content.shopping || {}).items || [];
+    var it = items.filter(function (x) { return x.id === id; })[0];
+    if (it) s[id] = it;
+  }
+  setSavedStore(s);
+}
+function costGrid(costs) {
+  if (!costs) return '';
+  var order = ['IL', 'UK', 'GR', 'US'];
+  var fm = function (x, ap) { return (x == null || isNaN(x)) ? '—' : (ap ? '~' : '') + '$' + Math.round(x); };
+  var rows = order.map(function (d) {
+    var c = costs[d];
+    if (!c) return '';
+    if (c.na) return '<div class="cg-r"><span class="cg-d">' + d + '</span><span class="cg-na">doesn’t ship</span></div>';
+    return '<div class="cg-r"><span class="cg-d">' + d + '</span><span class="num">' + fm(c.ship) + '</span>' +
+      '<span class="num">' + fm(c.imp, true) + '</span><b class="num">' + fm(c.tot, true) + '</b></div>';
+  }).join('');
+  if (!rows) return '';
+  return '<div class="costgrid"><div class="cg-r cg-h"><span></span><span>Ship</span><span>Import</span><span>All-in</span></div>' + rows + '</div>';
+}
+function shopCard(it, saved) {
   var img = (it.img && it.img.indexOf('data:image/') === 0) ?
     '<img class="scimg" src="' + it.img + '" alt="" loading="lazy">' :
     '<div class="scimg ph">🛍️</div>';
   var flags = (it.flags || []).map(function (f) {
-    var cls = /deal/i.test(f) ? ' good' : (/fake|above market|no coa/i.test(f) ? ' warn' : '');
+    var cls = /deal/i.test(f) ? ' good' : (/fake|above market|no coa|no longer|unverified/i.test(f) ? ' warn' : '');
     return '<span class="fchip2' + cls + '">' + esc(f) + '</span>';
   }).join('');
-  var ships = (it.ships || []).length ? '<span class="schip2">Ships: ' + it.ships.map(esc).join(' · ') + '</span>' : '';
   return '<div class="scard3">' +
-    (it.is_new ? '<span class="newbdg">NEW</span>' : '') + img +
+    (it.is_new ? '<span class="newbdg">NEW</span>' : '') +
+    '<button class="savestar num' + (saved ? ' on' : '') + '" data-id="' + esc(it.id) + '" aria-label="Save item" title="' +
+    (saved ? 'Remove from saved' : 'Save this item') + '">' + (saved ? '★' : '☆') + '</button>' + img +
     '<div class="scb">' +
     '<div class="sct">' + esc(it.t) + '</div>' +
     '<div class="scp num">' + esc(it.p) + '</div>' +
-    '<div class="scmeta"><span class="schip2">' + esc(it.site) + '</span>' +
-    (it.cond ? '<span class="schip2">' + esc(it.cond) + '</span>' : '') + ships + '</div>' +
+    '<div class="scmeta"><span class="schip2">From: ' + esc(it.origin || it.site) + '</span>' +
+    (it.cond ? '<span class="schip2">' + esc(it.cond) + '</span>' : '') + '</div>' +
+    costGrid(it.costs) +
     (flags ? '<div class="scmeta">' + flags + '</div>' : '') +
     (it.notes ? '<p class="scnotes">' + esc(it.notes) + '</p>' : '') +
     (it.mkt ? '<p class="scmkt">' + esc(it.mkt) + '</p>' : '') +
@@ -222,27 +253,38 @@ function shoppingHTML(s, sub) {
   var live = (s.items || []).filter(function (it) { return !it.gone; });
   var bySid = {};
   live.forEach(function (it) { (bySid[it.sid] = bySid[it.sid] || []).push(it); });
-  var known = { '': 1 };
+  var saved = savedStore();
+  var savedIds = Object.keys(saved);
+  var first = (s.searches || []).length ? s.searches[0].id : 'saved';
+  var known = { saved: 1 };
   (s.searches || []).forEach(function (q) { known[q.id] = 1; });
-  if (!known[sub]) sub = '';
+  if (!known[sub]) sub = first;
   function tab(id, label, cnt) {
-    return '<a href="#/shopping' + (id ? '/' + id : '') + '"' + (sub === id ? ' class="on"' : '') + '>' + esc(label) +
+    return '<a href="#/shopping/' + id + '"' + (sub === id ? ' class="on"' : '') + '>' + esc(label) +
       (cnt != null ? ' <span class="num">' + cnt + '</span>' : '') + '</a>';
   }
-  var subtabs = '<nav class="subtabs">' + tab('', 'All Finds', live.length) +
-    (s.searches || []).map(function (q) { return tab(q.id, q.name, (bySid[q.id] || []).length); }).join('') + '</nav>';
+  var subtabs = '<nav class="subtabs">' +
+    (s.searches || []).map(function (q) { return tab(q.id, q.name, (bySid[q.id] || []).length); }).join('') +
+    tab('saved', '★ Saved', savedIds.length) + '</nav>';
   var body = '';
   function grid(list) {
-    return list.length ? '<div class="shopgrid">' + list.map(shopCard).join('') + '</div>' :
+    return list.length ? '<div class="shopgrid">' + list.map(function (it) { return shopCard(it, !!saved[it.id]); }).join('') + '</div>' :
       '<p class="scempty">No live finds for this hunt right now — the robot keeps looking every morning.</p>';
   }
-  if (sub === '') {
-    (s.searches || []).forEach(function (q) {
-      var list = bySid[q.id] || [];
-      if (!list.length) return;
-      body += '<div class="ngroup"><span>' + esc(q.name) + ' · ' + list.length + '</span></div>' + grid(list);
+  if (sub === 'saved') {
+    var liveIds = {};
+    live.forEach(function (it) { liveIds[it.id] = 1; });
+    var list = savedIds.map(function (id) {
+      var it = saved[id];
+      if (!liveIds[id]) {
+        it = JSON.parse(JSON.stringify(it));
+        it.flags = (it.flags || []).concat(['No longer on the daily list']);
+        it.is_new = false;
+      }
+      return it;
     });
-    if (!body) body = '<p class="scempty">No live finds right now — the robot hunts every morning.</p>';
+    body = list.length ? '<div class="shopgrid">' + list.map(function (it) { return shopCard(it, true); }).join('') + '</div>' :
+      '<p class="scempty">Nothing saved yet — hit the ☆ on any find to keep it here.</p>';
   } else {
     var q = (s.searches || []).filter(function (x) { return x.id === sub; })[0] || {};
     if (q.notes) body += '<p class="scandate">' + esc(q.notes) + '</p>';
@@ -250,7 +292,7 @@ function shoppingHTML(s, sub) {
   }
   return '<article class="paper shop"><div class="edline">SHOPPING SCOUT' +
     (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' + subtabs + body +
-    '<div class="caughtup">Every listing was opened and verified live before it entered.</div></article>';
+    '<div class="caughtup">Every listing was opened and verified live before it entered. Costs are estimates.</div></article>';
 }
 
 /* ---------- Stock Screener ---------- */
@@ -520,6 +562,13 @@ function enter() {
 
 /* ---------- wiring ---------- */
 window.addEventListener('hashchange', route);
+$('view').addEventListener('click', function (ev) {
+  var b = ev.target && ev.target.closest ? ev.target.closest('.savestar') : null;
+  if (!b) return;
+  ev.preventDefault();
+  toggleSaved(b.getAttribute('data-id'));
+  route();
+});
 $('unlock-btn').addEventListener('click', function () {
   var t = $('key-input').value.trim();
   if (t) tryUnlock(t, false);
