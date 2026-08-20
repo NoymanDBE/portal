@@ -213,3 +213,26 @@ details.srow[open]>summary{border-bottom:1px solid var(--hair)}
 .paper.stocks .keypts li::before{background:var(--stocks)}
 .snote{font-style:italic;color:var(--text-2);font-size:13.5px;margin-top:14px;max-width:70ch}
 @media (max-width:560px){.spark2{display:none}.sr-px{margin-left:0}}
+
+/* ---- Shopping Scout (Phase 4) ---- */
+.paper.shop .subtabs a.on{color:var(--text-1);border-color:var(--shop)}
+.paper.shop .ngroup span{color:var(--text-2)}
+.shopgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;margin:14px 0 6px}
+.scard3{position:relative;display:flex;flex-direction:column;background:var(--bg-1);border:1px solid var(--hair);border-radius:14px;overflow:hidden}
+.scimg{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:var(--bg-2)}
+.scimg.ph{display:flex;align-items:center;justify-content:center;font-size:38px}
+.newbdg{position:absolute;top:10px;left:10px;z-index:2;font-size:10px;font-weight:800;letter-spacing:.08em;background:var(--shop);color:#08090A;border-radius:5px;padding:3px 8px}
+.scb{display:flex;flex-direction:column;flex:1;padding:12px 14px 14px}
+.sct{font-size:14px;font-weight:600;line-height:1.4}
+.scp{font-size:17px;font-weight:800;margin-top:7px}
+.scmeta{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.fchip2{font-size:10.5px;font-weight:700;letter-spacing:.02em;border-radius:999px;padding:3px 9px;background:var(--bg-3);color:var(--text-2)}
+.fchip2.good{background:color-mix(in srgb,var(--good) 14%,transparent);color:var(--good)}
+.fchip2.warn{background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--warn)}
+.scnotes{font-size:13px;line-height:1.55;color:var(--text-body);margin-top:9px}
+.scmkt{font-size:12.5px;line-height:1.5;color:var(--text-2);border-left:3px solid var(--shop);padding:6px 10px;background:var(--bg-2);border-radius:0 8px 8px 0;margin-top:9px}
+.scfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:12px}
+.scdate{font-size:11px;color:var(--text-3)}
+.sclink{font-size:12.5px;font-weight:700;color:var(--shop);white-space:nowrap}
+.sclink:hover{text-decoration:underline}
+.scempty{color:var(--text-3);font-size:14px;padding:18px 0}

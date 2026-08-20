@@ -58,10 +58,14 @@ def validate_images(sections):
     return kept, dropped
 
 
-src_html = open(sys.argv[1], encoding="utf-8").read()
-paper = json.loads(re.search(r"var PAPER = (\{.*?\});\n", src_html).group(1))
-arch_m = re.search(r"var ARCH = (\[.*?\]);\n", src_html)
-arch = json.loads(arch_m.group(1)) if arch_m else []
+if sys.argv[1].lower().endswith(".json"):
+    _st = json.load(open(sys.argv[1], encoding="utf-8"))
+    paper, arch = _st["PAPER"], _st.get("ARCH", [])
+else:
+    src_html = open(sys.argv[1], encoding="utf-8").read()
+    paper = json.loads(re.search(r"var PAPER = (\{.*?\});\n", src_html).group(1))
+    arch_m = re.search(r"var ARCH = (\[.*?\]);\n", src_html)
+    arch = json.loads(arch_m.group(1)) if arch_m else []
 
 img_kept, img_dropped = validate_images(paper.get("sections", []))
 
@@ -79,29 +83,20 @@ news = {
 }
 n_stories = sum(len(g.get("stories", [])) for s in news["sections"] for g in s.get("groups", []))
 
-home = {
-    "edition_line": f"{paper.get('hdate', '').upper()} · {n_stories} STORIES · EDITION OF {paper.get('date', '')}",
-    "lead": (paper.get("keys") or [paper.get("lead", "")])[0],
-    "news_status": f"Today's edition: {n_stories} stories across {len(news['sections'])} sections. Generated {paper.get('built', '')}.",
-    "stocks_status": "Feasibility-first small-cap research — moves here in Phase 3.",
-    "shopping_status": "Daily verified hunts for what you want — moves here in Phase 4.",
-}
-
 os.makedirs(os.path.join(ROOT, "data", today), exist_ok=True)
-for name, payload in [("news", news), ("home", home)]:
-    tmp = os.path.join(ROOT, "jobs", f"_{name}.json")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False)
-    dst = os.path.join(ROOT, "data", today, f"{name}.enc")
-    subprocess.run([sys.executable, os.path.join(ROOT, "jobs", "encrypt_blob.py"), tmp, dst, f"{name}-{today}"], check=True)
-    os.remove(tmp)
+tmp = os.path.join(ROOT, "jobs", "_news.json")
+with open(tmp, "w", encoding="utf-8") as f:
+    json.dump(news, f, ensure_ascii=False)
+dst = os.path.join(ROOT, "data", today, "news.enc")
+subprocess.run([sys.executable, os.path.join(ROOT, "jobs", "encrypt_blob.py"), tmp, dst, f"news-{today}"], check=True)
+os.remove(tmp)
 
 mpath = os.path.join(ROOT, "manifest.json")
 manifest = json.load(open(mpath, encoding="utf-8")) if os.path.exists(mpath) else {"files": {}}
 manifest["date"] = today
 manifest["generated_at"] = now
-manifest["files"]["home"] = f"data/{today}/home.enc"
 manifest["files"]["news"] = f"data/{today}/news.enc"
+manifest["files"].pop("home", None)
 with open(mpath, "w", encoding="utf-8") as f:
     json.dump(manifest, f)
 print(f"published news edition: {n_stories} stories, images kept {img_kept} / dropped {img_dropped}, manifest updated")

@@ -19,10 +19,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 today = datetime.date.today().isoformat()
 now = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
 
-src = open(sys.argv[1], encoding="utf-8").read()
-if "__FRAME_PREAMBLE" in src:
-    pre = src.index("__FRAME_PREAMBLE")
-    src = src[src.index("<title>", pre):src.rindex("</body></html>")]
+STATE_MODE = sys.argv[1].lower().endswith(".json")
+if STATE_MODE:
+    _st = json.load(open(sys.argv[1], encoding="utf-8"))
+    src = None
+else:
+    src = open(sys.argv[1], encoding="utf-8").read()
+    if "__FRAME_PREAMBLE" in src:
+        pre = src.index("__FRAME_PREAMBLE")
+        src = src[src.index("<title>", pre):src.rindex("</body></html>")]
 
 
 def var(name, default=None):
@@ -41,23 +46,29 @@ def text(pattern, flags=0):
     return htmllib.unescape(re.sub(r"<[^>]+>", " ", m.group(1))).strip()
 
 
-C = var("C")
-P = var("P")
-PORT = var("PORT", [])
-ASIDE = var("ASIDE", [])
-STRIP = var("STRIP", [])
+if STATE_MODE:
+    C, P = _st["C"], _st["P"]
+    PORT, ASIDE, STRIP = _st.get("PORT", []), _st.get("ASIDE", []), _st.get("STRIP", [])
+    built, kicker, h1 = _st.get("built", ""), _st.get("kicker", ""), _st.get("h1", "")
+    dateline, gist = _st.get("dateline", ""), _st.get("gist", [])
+else:
+    C = var("C")
+    P = var("P")
+    PORT = var("PORT", [])
+    ASIDE = var("ASIDE", [])
+    STRIP = var("STRIP", [])
 
-built = text(r'id="built">Updated <span class="ltr">(.*?)</span>')
-kicker = text(r'<div class="kicker">(.*?)</div>')
-h1 = text(r"<h1>(.*?)</h1>")
-dateline = re.sub(r"\s+", " ", text(r'id="dateline">(.*?)</div>', re.S))
-gist_m = re.search(r'<div class="gist">(.*?)\n\s*</div>', src, re.S)
-gist = []
-if gist_m:
-    for frag in re.findall(r"<(?:p|li)>(.*?)</(?:p|li)>", gist_m.group(1), re.S):
-        t = htmllib.unescape(re.sub(r"<[^>]+>", "", frag)).strip()
-        if t:
-            gist.append(re.sub(r"\s+", " ", t))
+    built = text(r'id="built">Updated <span class="ltr">(.*?)</span>')
+    kicker = text(r'<div class="kicker">(.*?)</div>')
+    h1 = text(r"<h1>(.*?)</h1>")
+    dateline = re.sub(r"\s+", " ", text(r'id="dateline">(.*?)</div>', re.S))
+    gist_m = re.search(r'<div class="gist">(.*?)\n\s*</div>', src, re.S)
+    gist = []
+    if gist_m:
+        for frag in re.findall(r"<(?:p|li)>(.*?)</(?:p|li)>", gist_m.group(1), re.S):
+            t = htmllib.unescape(re.sub(r"<[^>]+>", "", frag)).strip()
+            if t:
+                gist.append(re.sub(r"\s+", " ", t))
 
 scan = [c for c in C if c.get("t") not in PORT]
 tally = {v: sum(1 for c in scan if c.get("v") == v) for v in ("buy", "wait", "refrain")}

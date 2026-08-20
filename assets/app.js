@@ -113,7 +113,7 @@ function tryUnlock(jwkText, fromStore) {
       state.key = key;
       return fetchManifest();
     })
-    .then(function (m) { state.manifest = m; return loadBlob('home'); })
+    .then(function (m) { state.manifest = m; return loadBlob('news'); })
     .then(function () {
       if (!fromStore) { kvSet('pk', imported); $('key-input').value = ''; }
       enter();
@@ -132,7 +132,7 @@ function tryStoredKey() {
     if (!key) { showGate(); return; }
     state.key = key;
     return fetchManifest()
-      .then(function (m) { state.manifest = m; return loadBlob('home'); })
+      .then(function (m) { state.manifest = m; return loadBlob('news'); })
       .then(enter)
       .catch(function (e) {
         if (e && e.step === 'manifest') { showGate(); gateError(e); return; }
@@ -143,11 +143,11 @@ function tryStoredKey() {
 }
 
 /* ---------- views ---------- */
-var NAMES = { home: 'Home', news: "Dror's Morning News", stocks: "Dror's Stock Screener", shopping: "Dror's Shopping Scout" };
+var NAMES = { news: "Dror's Morning News", stocks: "Dror's Stock Screener", shopping: "Dror's Shopping Scout" };
 function parseRoute() {
-  var parts = (location.hash.replace(/^#\/?/, '') || 'home').split('/');
-  var r = parts[0] || 'home';
-  if (!NAMES[r]) r = 'home';
+  var parts = (location.hash.replace(/^#\/?/, '') || 'news').split('/');
+  var r = parts[0] || 'news';
+  if (!NAMES[r]) r = 'news';
   return { r: r, sub: parts.slice(1).join('/') };
 }
 function route() {
@@ -156,7 +156,6 @@ function route() {
     a.classList.toggle('on', a.getAttribute('data-r') === cur.r);
   });
   var v = $('view');
-  if (cur.r === 'home') { v.innerHTML = homeHTML(state.content.home); return; }
   if (cur.r === 'news') {
     if (state.content.news) { v.innerHTML = newsHTML(state.content.news, cur.sub); return; }
     v.innerHTML = '<div class="placeholder"><div class="b">Decrypting today’s edition…</div></div>';
@@ -175,12 +174,83 @@ function route() {
       var now = parseRoute();
       if (now.r === 'stocks') v.innerHTML = stocksHTML(state.content.stocks, now.sub);
     }).catch(function () {
-      v.innerHTML = '<div class="placeholder"><div class="a">No board yet.</div><div class="b">The scan lands around 06:20.</div></div>';
+      v.innerHTML = '<div class="placeholder"><div class="a">No board yet.</div><div class="b">The scan lands around 06:00.</div></div>';
+    });
+    return;
+  }
+  if (cur.r === 'shopping' && state.manifest && state.manifest.files && state.manifest.files.shopping) {
+    if (state.content.shopping) { v.innerHTML = shoppingHTML(state.content.shopping, cur.sub); return; }
+    v.innerHTML = '<div class="placeholder"><div class="b">Decrypting today’s finds…</div></div>';
+    loadBlob('shopping').then(function () {
+      var now = parseRoute();
+      if (now.r === 'shopping') v.innerHTML = shoppingHTML(state.content.shopping, now.sub);
+    }).catch(function () {
+      v.innerHTML = '<div class="placeholder"><div class="a">No finds yet.</div><div class="b">The hunt runs each morning.</div></div>';
     });
     return;
   }
   v.innerHTML = '<div class="placeholder"><div class="a">' + NAMES[cur.r] + '</div>' +
-    '<div class="b">This section arrives in ' + ({ stocks: 'Phase 3', shopping: 'Phase 4' })[cur.r] + ' — the pipeline behind it is already being wired.</div></div>';
+    '<div class="b">Nothing here yet — the daily job that fills this section hasn’t published.</div></div>';
+}
+
+/* ---------- Shopping Scout ---------- */
+function shopCard(it) {
+  var img = (it.img && it.img.indexOf('data:image/') === 0) ?
+    '<img class="scimg" src="' + it.img + '" alt="" loading="lazy">' :
+    '<div class="scimg ph">🛍️</div>';
+  var flags = (it.flags || []).map(function (f) {
+    var cls = /deal/i.test(f) ? ' good' : (/fake|above market|no coa/i.test(f) ? ' warn' : '');
+    return '<span class="fchip2' + cls + '">' + esc(f) + '</span>';
+  }).join('');
+  var ships = (it.ships || []).length ? '<span class="schip2">Ships: ' + it.ships.map(esc).join(' · ') + '</span>' : '';
+  return '<div class="scard3">' +
+    (it.is_new ? '<span class="newbdg">NEW</span>' : '') + img +
+    '<div class="scb">' +
+    '<div class="sct">' + esc(it.t) + '</div>' +
+    '<div class="scp num">' + esc(it.p) + '</div>' +
+    '<div class="scmeta"><span class="schip2">' + esc(it.site) + '</span>' +
+    (it.cond ? '<span class="schip2">' + esc(it.cond) + '</span>' : '') + ships + '</div>' +
+    (flags ? '<div class="scmeta">' + flags + '</div>' : '') +
+    (it.notes ? '<p class="scnotes">' + esc(it.notes) + '</p>' : '') +
+    (it.mkt ? '<p class="scmkt">' + esc(it.mkt) + '</p>' : '') +
+    '<div class="scfoot"><span class="scdate num">found ' + esc(it.found || '') +
+    (it.chk ? ' · checked ' + esc(it.chk) : '') + '</span>' +
+    '<a class="sclink" href="' + esc(it.u) + '" target="_blank" rel="noopener noreferrer">View listing ↗</a></div>' +
+    '</div></div>';
+}
+function shoppingHTML(s, sub) {
+  var live = (s.items || []).filter(function (it) { return !it.gone; });
+  var bySid = {};
+  live.forEach(function (it) { (bySid[it.sid] = bySid[it.sid] || []).push(it); });
+  var known = { '': 1 };
+  (s.searches || []).forEach(function (q) { known[q.id] = 1; });
+  if (!known[sub]) sub = '';
+  function tab(id, label, cnt) {
+    return '<a href="#/shopping' + (id ? '/' + id : '') + '"' + (sub === id ? ' class="on"' : '') + '>' + esc(label) +
+      (cnt != null ? ' <span class="num">' + cnt + '</span>' : '') + '</a>';
+  }
+  var subtabs = '<nav class="subtabs">' + tab('', 'All Finds', live.length) +
+    (s.searches || []).map(function (q) { return tab(q.id, q.name, (bySid[q.id] || []).length); }).join('') + '</nav>';
+  var body = '';
+  function grid(list) {
+    return list.length ? '<div class="shopgrid">' + list.map(shopCard).join('') + '</div>' :
+      '<p class="scempty">No live finds for this hunt right now — the robot keeps looking every morning.</p>';
+  }
+  if (sub === '') {
+    (s.searches || []).forEach(function (q) {
+      var list = bySid[q.id] || [];
+      if (!list.length) return;
+      body += '<div class="ngroup"><span>' + esc(q.name) + ' · ' + list.length + '</span></div>' + grid(list);
+    });
+    if (!body) body = '<p class="scempty">No live finds right now — the robot hunts every morning.</p>';
+  } else {
+    var q = (s.searches || []).filter(function (x) { return x.id === sub; })[0] || {};
+    if (q.notes) body += '<p class="scandate">' + esc(q.notes) + '</p>';
+    body += grid(bySid[sub] || []);
+  }
+  return '<article class="paper shop"><div class="edline">SHOPPING SCOUT' +
+    (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' + subtabs + body +
+    '<div class="caughtup">Every listing was opened and verified live before it entered.</div></article>';
 }
 
 /* ---------- Stock Screener ---------- */
@@ -438,25 +508,6 @@ function newsHTML(n, sub) {
     newsSubtabs(n, sub) + body + '</article>';
 }
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function homeHTML(h) {
-  h = h || {};
-  var files = (state.manifest && state.manifest.files) || {};
-  var stStatus = files.stocks ? 'Today\'s board is published — every company scored, priced, and argued.' :
-    (h.stocks_status || 'Feasibility-first small-cap research.');
-  return '<div class="edline">' + esc(h.edition_line || '') + '</div>' +
-    '<div class="hero-num">' + esc(h.lead || 'Welcome.') + '</div>' +
-    '<span class="okchip">✓ Decryption verified — this content was unreadable without your key</span>' +
-    '<div class="mods">' +
-    mod('news', 'Dror\'s Morning News', h.news_status || 'Verified stories with confidence scores.', 'LIVE') +
-    mod('stocks', 'Dror\'s Stock Screener', stStatus, files.stocks ? 'LIVE' : 'Phase 3') +
-    mod('shopping', 'Dror\'s Shopping Scout', h.shopping_status || 'Daily verified hunts for what you want.', 'Phase 4') +
-    '</div>';
-}
-function mod(slug, name, desc, phase) {
-  var color = { news: 'var(--news)', stocks: 'var(--stocks)', shopping: 'var(--shop)' }[slug];
-  return '<a class="mod" href="#/' + slug + '"><span class="dot" style="background:' + color + '"></span><h3>' + name + '</h3>' +
-    '<p>' + esc(desc) + '</p><div class="st"><span class="phase">' + phase + '</span></div></a>';
-}
 function enter() {
   $('gate').hidden = true;
   $('gate').style.display = 'none';
