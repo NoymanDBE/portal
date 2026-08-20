@@ -168,8 +168,178 @@ function route() {
     });
     return;
   }
+  if (cur.r === 'stocks' && state.manifest && state.manifest.files && state.manifest.files.stocks) {
+    if (state.content.stocks) { v.innerHTML = stocksHTML(state.content.stocks, cur.sub); return; }
+    v.innerHTML = '<div class="placeholder"><div class="b">Decrypting today’s board…</div></div>';
+    loadBlob('stocks').then(function () {
+      var now = parseRoute();
+      if (now.r === 'stocks') v.innerHTML = stocksHTML(state.content.stocks, now.sub);
+    }).catch(function () {
+      v.innerHTML = '<div class="placeholder"><div class="a">No board yet.</div><div class="b">The scan lands around 06:20.</div></div>';
+    });
+    return;
+  }
   v.innerHTML = '<div class="placeholder"><div class="a">' + NAMES[cur.r] + '</div>' +
     '<div class="b">This section arrives in ' + ({ stocks: 'Phase 3', shopping: 'Phase 4' })[cur.r] + ' — the pipeline behind it is already being wired.</div></div>';
+}
+
+/* ---------- Stock Screener ---------- */
+function fnum(x, dp) {
+  if (x == null || isNaN(x)) return '—';
+  return Number(x).toFixed(dp == null ? 2 : dp);
+}
+function fpct(x) {
+  if (x == null || isNaN(x)) return '—';
+  return (x > 0 ? '+' : '') + Number(x).toFixed(2) + '%';
+}
+function sparkSVG(closes) {
+  if (!closes || closes.length < 2) return '';
+  var lo = Math.min.apply(null, closes), hi = Math.max.apply(null, closes);
+  var span = (hi - lo) || 1, W = 120, H = 34, PAD = 2;
+  var pts = closes.map(function (c, i) {
+    var x = PAD + i * (W - 2 * PAD) / (closes.length - 1);
+    var y = H - PAD - (c - lo) * (H - 2 * PAD) / span;
+    return x.toFixed(1) + ',' + y.toFixed(1);
+  }).join(' ');
+  var up = closes[closes.length - 1] >= closes[0];
+  return '<svg class="spark2" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-hidden="true">' +
+    '<polyline class="' + (up ? 'up' : 'dn') + '" points="' + pts + '"/></svg>';
+}
+function chgPill(x) {
+  if (x == null || isNaN(x)) return '';
+  return '<span class="chgp num ' + (x >= 0 ? 'up' : 'dn') + '">' + fpct(x) + '</span>';
+}
+function meterHTML(label, val, max) {
+  var p = Math.max(0, Math.min(100, (val / max) * 100));
+  var cls = p >= 70 ? '' : (p >= 40 ? ' warn' : ' bad');
+  return '<div class="mtr2"><span class="mtr2-l">' + esc(label) + '</span>' +
+    '<span class="mtr2-t"><span class="mtr2-f' + cls + '" style="width:' + p.toFixed(0) + '%"></span></span>' +
+    '<span class="mtr2-n num">' + esc(val) + '</span></div>';
+}
+function stockRow(e, P) {
+  var q = (P || {})[e.t] || {};
+  var vlabel = { buy: 'BUY', wait: 'WAIT', refrain: 'REFRAIN' }[e.v] || esc(e.v || '');
+  var sincePct = (e.since && e.since.px && q.last) ? ((q.last / e.since.px - 1) * 100) : null;
+  var meta = '';
+  if (e.cap) meta += '<span class="schip2 num">' + esc(e.cap) + '</span>';
+  if (sincePct != null) meta += '<span class="schip2 num ' + (sincePct >= 0 ? 'upc' : 'dnc') + '">' +
+    fpct(sincePct) + ' <i>since pick</i></span>';
+  if (e.feas && e.feas.p != null) meta += '<span class="schip2 num">FEAS ' + esc(e.feas.p) + '%</span>';
+  if (e.tgt != null) meta += '<span class="schip2 num">EV $' + fnum(e.tgt) + (e.tgtPct != null ? ' (' + fpct(e.tgtPct) + ')' : '') + '</span>';
+  if (e.conf != null) meta += '<span class="schip2 num">CONF ' + esc(e.conf) + '%</span>';
+  if (e.chgTag) meta += '<span class="schip2 chg">' + esc(e.chgTag) + '</span>';
+
+  var body = '';
+  if (e.does) body += '<div class="nlabel">WHAT IT DOES</div><p>' + esc(e.does) + '</p>';
+  if (e.edge) body += '<div class="nlabel">THE EDGE</div><p>' + esc(e.edge) + '</p>';
+  if (e.why) body += '<div class="nlabel">WHY NOW</div><p>' + esc(e.why) + '</p>';
+  if (e.verdict) body += '<div class="nlabel">THE VERDICT</div>' + paras(e.verdict);
+  if (e.bear) body += '<div class="nlabel dis">THE BEAR CASE</div><div class="dispbox">' + paras(e.bear) + '</div>';
+  if (e.ev) body += '<div class="nlabel">THE EVIDENCE</div>' + paras(e.ev);
+  if ((e.sn || []).length) {
+    body += '<div class="nlabel">SCENARIOS</div><div class="snbox">' + e.sn.map(function (s) {
+      return '<div class="snrow"><span class="snp num">' + Math.round((s[2] || 0) * 100) + '%</span>' +
+        '<span class="snl">' + esc(s[0]) + '<span class="snbar"><span style="width:' + Math.round((s[2] || 0) * 100) + '%"></span></span></span>' +
+        '<span class="snv num">$' + fnum(s[1]) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  if (e.sc) {
+    body += '<div class="nlabel">SCORES</div><div class="meters2">' +
+      meterHTML('Tech', e.sc.tech, 10) + meterHTML('Evidence', e.sc.evid, 10) +
+      meterHTML('Balance', e.sc.bal, 10) + meterHTML('Value', e.sc.val, 10) +
+      (e.up != null ? meterHTML('Upside', e.up, 10) : '') +
+      (e.risk != null ? meterHTML('Risk', e.risk, 10) : '') + '</div>';
+  }
+  var qs = [];
+  if (q.chg1m != null) qs.push(['1M', fpct(q.chg1m), q.chg1m]);
+  if (q.chg3m != null) qs.push(['3M', fpct(q.chg3m), q.chg3m]);
+  if (q.offHi != null) qs.push(['Off 52w high', fpct(q.offHi), q.offHi]);
+  if (q.vsSma50 != null) qs.push(['vs SMA50', fpct(q.vsSma50), q.vsSma50]);
+  if (q.vsSma200 != null) qs.push(['vs SMA200', fpct(q.vsSma200), q.vsSma200]);
+  if (q.volAnn != null) qs.push(['Volatility', fnum(q.volAnn, 1) + '%', 0]);
+  if (q.volRel != null) qs.push(['Rel volume', fnum(q.volRel, 2) + 'x', 0]);
+  var grid = qs.map(function (p) {
+    var cls = p[2] > 0 ? ' upc' : (p[2] < 0 ? ' dnc' : '');
+    return '<div><dt>' + esc(p[0]) + '</dt><dd class="num' + cls + '">' + esc(p[1]) + '</dd></div>';
+  }).concat((e.stats || []).map(function (p) {
+    return '<div><dt>' + esc(p[0]) + '</dt><dd class="num">' + esc(p[1]) + '</dd></div>';
+  })).join('');
+  if (grid) body += '<div class="nlabel">THE NUMBERS</div><dl class="statgrid">' + grid + '</dl>';
+  if ((e.watch || []).length) {
+    body += '<div class="nlabel">WATCHING</div><ul class="keypts sm">' +
+      e.watch.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
+  }
+  if (e.note) body += '<p class="snote">' + esc(e.note) + '</p>';
+
+  return '<details class="srow v-' + esc(e.v || '') + '">' +
+    '<summary><div class="sr-head">' +
+    '<span class="sr-tick num">' + esc(e.t) + '</span>' +
+    '<span class="sr-name">' + esc(e.n) + '</span>' +
+    '<span class="vpill ' + esc(e.v || '') + '">' + vlabel + '</span>' +
+    sparkSVG(q.c) +
+    '<span class="sr-px num">' + (q.last != null ? '$' + fnum(q.last) : '') + '</span>' +
+    chgPill(q.chg1d) + '</div>' +
+    '<div class="sr-meta">' + meta + '</div>' +
+    (e.gist ? '<div class="sr-gist">' + esc(e.gist) + '</div>' : '') +
+    '</summary><div class="nbody">' + body + '</div></details>';
+}
+function stocksSubtabs(s, sub) {
+  var scan = s.C.filter(function (c) { return s.port.indexOf(c.t) < 0; });
+  function n(v) { return scan.filter(function (c) { return c.v === v; }).length; }
+  function tab(id, label, cnt) {
+    return '<a href="#/stocks' + (id ? '/' + id : '') + '"' + (sub === id ? ' class="on"' : '') + '>' + label +
+      (cnt != null ? ' <span class="num">' + cnt + '</span>' : '') + '</a>';
+  }
+  return '<nav class="subtabs">' + tab('', 'Board', scan.length) +
+    tab('buy', 'Buy', n('buy')) + tab('wait', 'Wait', n('wait')) + tab('refrain', 'Refrain', n('refrain')) +
+    tab('portfolio', 'My Portfolio', s.port.length) + tab('dropped', 'Dropped', s.aside.length) + '</nav>';
+}
+function stripHTML(s) {
+  var tiles = (s.strip || []).map(function (t) {
+    var q = s.P[t];
+    if (!q) return '';
+    return '<div class="mtile2"><span class="mtt num">' + esc(t) + '</span>' +
+      '<span class="mtp num">$' + fnum(q.last) + '</span>' +
+      '<span class="mtc num ' + (q.chg1d >= 0 ? 'upc' : 'dnc') + '">' + fpct(q.chg1d) + '</span></div>';
+  }).join('');
+  return tiles ? '<div class="mstrip2">' + tiles + '</div>' : '';
+}
+function stocksHTML(s, sub) {
+  var known = { '': 1, buy: 1, wait: 1, refrain: 1, portfolio: 1, dropped: 1 };
+  if (!known[sub]) sub = '';
+  var scan = s.C.filter(function (c) { return s.port.indexOf(c.t) < 0; });
+  var byT = {};
+  s.C.forEach(function (c) { byT[c.t] = c; });
+  var body = stripHTML(s);
+  function rows(list) { return list.map(function (e) { return stockRow(e, s.P); }).join(''); }
+  function group(v, label) {
+    var list = scan.filter(function (c) { return c.v === v; });
+    if (!list.length) return '';
+    return '<div class="ngroup"><span>' + label + ' · ' + list.length + '</span></div>' + rows(list);
+  }
+  if (sub === '') {
+    if ((s.gist || []).length) {
+      body += '<div class="nlabel">THIS MORNING, BRIEFLY</div><ul class="keypts">' +
+        s.gist.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') + '</ul>';
+    }
+    body += group('buy', 'BUY') + group('wait', 'WAIT') + group('refrain', 'REFRAIN');
+  } else if (sub === 'portfolio') {
+    body += rows(s.port.map(function (t) { return byT[t]; }).filter(Boolean));
+  } else if (sub === 'dropped') {
+    body += '<div class="nlabel">DROPPED FROM THE BOARD</div>' +
+      rows(s.aside.map(function (t) { return byT[t]; }).filter(Boolean));
+  } else {
+    body += rows(scan.filter(function (c) { return c.v === sub; }));
+  }
+  return '<article class="paper stocks"><div class="edline">' + esc((s.kicker || '').toUpperCase()) +
+    (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' +
+    '<div class="tallyrow">' +
+    '<span class="tly buy num">' + (s.tally || {}).buy + ' BUY</span>' +
+    '<span class="tly wait num">' + (s.tally || {}).wait + ' WAIT</span>' +
+    '<span class="tly refrain num">' + (s.tally || {}).refrain + ' REFRAIN</span></div>' +
+    (s.dateline ? '<p class="scandate">' + esc(s.dateline) + '</p>' : '') +
+    stocksSubtabs(s, sub) + body +
+    '<div class="caughtup">Bottom lines are research, not personalized investment advice.</div></article>';
 }
 
 /* ---------- Morning News ---------- */
@@ -270,12 +440,15 @@ function newsHTML(n, sub) {
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 function homeHTML(h) {
   h = h || {};
+  var files = (state.manifest && state.manifest.files) || {};
+  var stStatus = files.stocks ? 'Today\'s board is published — every company scored, priced, and argued.' :
+    (h.stocks_status || 'Feasibility-first small-cap research.');
   return '<div class="edline">' + esc(h.edition_line || '') + '</div>' +
     '<div class="hero-num">' + esc(h.lead || 'Welcome.') + '</div>' +
     '<span class="okchip">✓ Decryption verified — this content was unreadable without your key</span>' +
     '<div class="mods">' +
-    mod('news', 'Dror\'s Morning News', h.news_status || 'Verified stories with confidence scores.', 'Phase 2') +
-    mod('stocks', 'Dror\'s Stock Screener', h.stocks_status || 'Feasibility-first small-cap research.', 'Phase 3') +
+    mod('news', 'Dror\'s Morning News', h.news_status || 'Verified stories with confidence scores.', 'LIVE') +
+    mod('stocks', 'Dror\'s Stock Screener', stStatus, files.stocks ? 'LIVE' : 'Phase 3') +
     mod('shopping', 'Dror\'s Shopping Scout', h.shopping_status || 'Daily verified hunts for what you want.', 'Phase 4') +
     '</div>';
 }
