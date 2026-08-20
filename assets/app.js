@@ -225,21 +225,24 @@ function costGrid(costs) {
 }
 function shopCard(it, saved) {
   var img = (it.img && it.img.indexOf('data:image/') === 0) ?
-    '<img class="scimg" src="' + it.img + '" alt="" loading="lazy">' :
-    '<div class="scimg ph">🛍️</div>';
+    '<img class="shthumb" src="' + it.img + '" alt="" loading="lazy">' :
+    '<div class="shthumb ph">🛍️</div>';
   var flags = (it.flags || []).map(function (f) {
     var cls = /deal/i.test(f) ? ' good' : (/fake|above market|no coa|no longer|unverified/i.test(f) ? ' warn' : '');
     return '<span class="fchip2' + cls + '">' + esc(f) + '</span>';
   }).join('');
-  return '<div class="scard3">' +
-    (it.is_new ? '<span class="newbdg">NEW</span>' : '') +
-    '<button class="savestar num' + (saved ? ' on' : '') + '" data-id="' + esc(it.id) + '" aria-label="Save item" title="' +
-    (saved ? 'Remove from saved' : 'Save this item') + '">' + (saved ? '★' : '☆') + '</button>' + img +
-    '<div class="scb">' +
-    '<div class="sct">' + esc(it.t) + '</div>' +
-    '<div class="scp num">' + esc(it.p) + '</div>' +
-    '<div class="scmeta"><span class="schip2">From: ' + esc(it.origin || it.site) + '</span>' +
-    (it.cond ? '<span class="schip2">' + esc(it.cond) + '</span>' : '') + '</div>' +
+  var topFlag = (it.flags || [])[0];
+  var star = '<button class="savestar num' + (saved ? ' on' : '') + '" data-id="' + esc(it.id) + '" aria-label="Save item" title="' +
+    (saved ? 'Remove from saved' : 'Save this item') + '">' + (saved ? '★' : '☆') + '</button>';
+  return '<details class="shrow">' +
+    '<summary>' + img +
+    '<span class="shmain"><span class="sht">' + esc(it.t) + '</span>' +
+    '<span class="shsub">' + esc(it.origin || it.site) + (it.cond ? ' · ' + esc(it.cond) : '') + '</span></span>' +
+    (it.is_new ? '<span class="newbdg2">NEW</span>' : '') +
+    (topFlag ? '<span class="fchip2' + (/deal/i.test(topFlag) ? ' good' : (/fake|above market|no coa|no longer|unverified/i.test(topFlag) ? ' warn' : '')) + ' shflag">' + esc(topFlag) + '</span>' : '') +
+    '<span class="shp num">' + esc(it.p) + '</span>' + star +
+    '</summary>' +
+    '<div class="shbody">' +
     costGrid(it.costs) +
     (flags ? '<div class="scmeta">' + flags + '</div>' : '') +
     (it.notes ? '<p class="scnotes">' + esc(it.notes) + '</p>' : '') +
@@ -247,7 +250,7 @@ function shopCard(it, saved) {
     '<div class="scfoot"><span class="scdate num">found ' + esc(it.found || '') +
     (it.chk ? ' · checked ' + esc(it.chk) : '') + '</span>' +
     '<a class="sclink" href="' + esc(it.u) + '" target="_blank" rel="noopener noreferrer">View listing ↗</a></div>' +
-    '</div></div>';
+    '</div></details>';
 }
 function shoppingHTML(s, sub) {
   var live = (s.items || []).filter(function (it) { return !it.gone; });
@@ -268,7 +271,7 @@ function shoppingHTML(s, sub) {
     tab('saved', '★ Saved', savedIds.length) + '</nav>';
   var body = '';
   function grid(list) {
-    return list.length ? '<div class="shopgrid">' + list.map(function (it) { return shopCard(it, !!saved[it.id]); }).join('') + '</div>' :
+    return list.length ? '<div class="shoplist">' + list.map(function (it) { return shopCard(it, !!saved[it.id]); }).join('') + '</div>' :
       '<p class="scempty">No live finds for this hunt right now — the robot keeps looking every morning.</p>';
   }
   if (sub === 'saved') {
@@ -283,7 +286,7 @@ function shoppingHTML(s, sub) {
       }
       return it;
     });
-    body = list.length ? '<div class="shopgrid">' + list.map(function (it) { return shopCard(it, true); }).join('') + '</div>' :
+    body = list.length ? '<div class="shoplist">' + list.map(function (it) { return shopCard(it, true); }).join('') + '</div>' :
       '<p class="scempty">Nothing saved yet — hit the ☆ on any find to keep it here.</p>';
   } else {
     var q = (s.searches || []).filter(function (x) { return x.id === sub; })[0] || {};
