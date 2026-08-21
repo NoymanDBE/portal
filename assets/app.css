@@ -279,3 +279,23 @@ details.shrow .savestar:hover,details.shrow .savestar.on{color:var(--warn)}
 .kl{font:11px var(--mono);fill:var(--text-3)}
 .kw.up,.kb.up{stroke:var(--good)}.kb.up{fill:var(--good)}.kw.dn,.kb.dn{stroke:var(--bad)}.kb.dn{fill:var(--bad)}
 .kline{fill:none;stroke:var(--stocks);stroke-width:1.6}
+/* ---- interactive chart chrome ---- */
+.kwrap{margin-bottom:12px}
+.kchart{touch-action:pan-y;cursor:crosshair}
+.klegend{display:flex;flex-wrap:wrap;gap:4px 12px;font:11.5px/1.5 var(--mono);color:var(--text-3);margin:4px 0 6px}
+.klegend b{color:var(--text-1);font-weight:700}
+.klegend .kd{color:var(--text-2)}
+.kv.up{fill:var(--good);opacity:.45}.kv.dn{fill:var(--bad);opacity:.45}
+.kma{fill:none;stroke-width:1.4;vector-effect:non-scaling-stroke}
+.kma20{stroke:var(--stocks)}.kma50{stroke:var(--news)}
+.kcx,.kcy{stroke:var(--text-2);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.kpl{fill:var(--bg-3);stroke:var(--hair)}
+.kpt{font:11px var(--mono);fill:var(--text-1)}
+.klastbox{fill:color-mix(in srgb,var(--stocks) 25%,var(--bg-3))}
+.km{text-anchor:middle}
+.kctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.kctl button{font:600 11.5px/1 var(--mono);color:var(--text-2);background:var(--bg-2);border:1px solid var(--hair);border-radius:6px;padding:6px 9px;display:inline-flex;align-items:center;gap:5px}
+.kctl button.on{color:var(--text-1);border-color:var(--stocks);background:color-mix(in srgb,var(--stocks) 14%,transparent)}
+.ksep{width:1px;height:16px;background:var(--hair);margin:0 4px}
+.kdot{width:14px;height:2px;display:inline-block;border-radius:1px}
+.kdot.ma20{background:var(--stocks)}.kdot.ma50{background:var(--news)}

@@ -331,42 +331,138 @@ function meterHTML(label, val, max) {
     '<span class="mtr2-t"><span class="mtr2-f' + cls + '" style="width:' + p.toFixed(0) + '%"></span></span>' +
     '<span class="mtr2-n num">' + esc(val) + '</span></div>';
 }
-function candleSVG(q) {
-  var W = 640, H = 260, L = 8, R = 58, T = 10, B = 14;
-  var pw = W - L - R, ph = H - T - B;
-  var bars = (q && q.ohlc && q.ohlc.length > 5) ? q.ohlc.slice(-90) : null;
-  var cs = (!bars && q && q.c && q.c.length > 5) ? q.c.slice(-90) : null;
-  if (!bars && !cs) return '';
-  var n = bars ? bars.length : cs.length, lo = Infinity, hi = -Infinity;
-  if (bars) bars.forEach(function (b) { if (b[2] < lo) lo = b[2]; if (b[1] > hi) hi = b[1]; });
-  else cs.forEach(function (c) { if (c < lo) lo = c; if (c > hi) hi = c; });
-  var span = (hi - lo) || 1;
-  var y = function (v) { return T + (hi - v) * ph / span; };
-  var step = pw / n, bw = Math.max(2, step * 0.62);
-  var out = '<svg class="kchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Daily candles, last ' + n + ' sessions">';
-  for (var g = 0; g <= 4; g++) {
-    var v = lo + span * g / 4, yy = y(v).toFixed(1);
-    out += '<line class="kg" x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '"/>' +
-      '<text class="kl" x="' + (W - R + 6) + '" y="' + (y(v) + 4).toFixed(1) + '">' + fnum(v, v >= 100 ? 0 : 2) + '</text>';
+/* ---- interactive daily chart (candles + volume + MAs + crosshair) ---- */
+var KG = { W: 640, H: 340, L: 8, R: 60, T: 8, PB: 226, VT: 238, VB: 318 };
+var KR = [['1M', 22], ['3M', 63], ['6M', 126], ['1Y', 9999]];
+var K = { range: {}, ma20: true, ma50: true };
+function kBars(q) {
+  if (!q || !q.ohlc || q.ohlc.length < 5) return null;
+  return q.ohlc.map(function (b, i) {
+    return { o: b[0], h: b[1], l: b[2], c: b[3], v: (q.v || [])[i] || 0, d: (q.dts || [])[i] || '' };
+  });
+}
+function kGeom(q, t) {
+  var all = kBars(q);
+  if (!all) return null;
+  var key = K.range[t] || '3M';
+  var want = (KR.filter(function (r) { return r[0] === key; })[0] || KR[1])[1];
+  var start = Math.max(0, all.length - want);
+  var bars = all.slice(start), n = bars.length, lo = Infinity, hi = -Infinity, vmax = 0;
+  bars.forEach(function (b) { if (b.l < lo) lo = b.l; if (b.h > hi) hi = b.h; if (b.v > vmax) vmax = b.v; });
+  var span = (hi - lo) || 1, pw = KG.W - KG.L - KG.R, ph = KG.PB - KG.T, step = pw / n;
+  return { all: all, bars: bars, start: start, n: n, lo: lo, hi: hi, span: span, vmax: vmax || 1, pw: pw, ph: ph, step: step, key: key,
+    y: function (v) { return KG.T + (hi - v) * ph / span; },
+    x: function (i) { return KG.L + i * step + step / 2; },
+    vy: function (v) { return KG.VB - (v / (vmax || 1)) * (KG.VB - KG.VT); } };
+}
+function kLegend(b, prev) {
+  var chg = (prev && prev.c) ? ((b.c / prev.c - 1) * 100) : null;
+  return '<span class="kd num">' + esc(b.d || '') + '</span>' +
+    '<span>O <b class="num">' + fnum(b.o) + '</b></span><span>H <b class="num">' + fnum(b.h) + '</b></span>' +
+    '<span>L <b class="num">' + fnum(b.l) + '</b></span><span>C <b class="num">' + fnum(b.c) + '</b></span>' +
+    '<span>Vol <b class="num">' + fvol(b.v) + '</b></span>' +
+    (chg != null ? '<span class="num ' + (chg >= 0 ? 'upc' : 'dnc') + '">' + fpct(chg) + '</span>' : '');
+}
+function fvol(v) {
+  if (v == null) return '—';
+  if (v >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + 'K';
+  return String(v);
+}
+function candleSVG(t, q) {
+  var g = kGeom(q, t);
+  if (!g) {
+    var cs = (q && q.c && q.c.length > 5) ? q.c.slice(-126) : null;
+    if (!cs) return '';
+    var lo = Math.min.apply(null, cs), hi = Math.max.apply(null, cs), span = (hi - lo) || 1, pw = KG.W - KG.L - KG.R, step = pw / cs.length;
+    var yy = function (v) { return KG.T + (hi - v) * (KG.PB - KG.T) / span; };
+    return '<div class="nlabel">DAILY CLOSES · LAST ' + cs.length + ' SESSIONS</div><svg class="kchart" viewBox="0 0 ' + KG.W + ' ' + KG.PB + '">' +
+      '<polyline class="kline" points="' + cs.map(function (c, i) { return (KG.L + i * step + step / 2).toFixed(1) + ',' + yy(c).toFixed(1); }).join(' ') + '"/></svg>';
   }
-  if (bars) {
-    bars.forEach(function (b, i) {
-      var o = b[0], h = b[1], l = b[2], c = b[3], x = L + i * step + step / 2, up = c >= o;
-      var top = y(Math.max(o, c)), bot = y(Math.min(o, c));
-      if (bot - top < 1) bot = top + 1;
-      var cls = up ? 'up' : 'dn';
-      out += '<line class="kw ' + cls + '" x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + y(h).toFixed(1) + '" y2="' + y(l).toFixed(1) + '"/>' +
-        '<rect class="kb ' + cls + '" x="' + (x - bw / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (bot - top).toFixed(1) + '"/>';
-    });
-  } else {
-    out += '<polyline class="kline" points="' + cs.map(function (c, i) {
-      return (L + i * step + step / 2).toFixed(1) + ',' + y(c).toFixed(1);
-    }).join(' ') + '"/>';
+  var out = '<svg class="kchart" viewBox="0 0 ' + KG.W + ' ' + KG.H + '" role="img" aria-label="Daily candles and volume" data-t="' + esc(t) + '">';
+  for (var i = 0; i <= 4; i++) {
+    var v = g.lo + g.span * i / 4, y = g.y(v).toFixed(1);
+    out += '<line class="kg" x1="' + KG.L + '" x2="' + (KG.W - KG.R) + '" y1="' + y + '" y2="' + y + '"/>' +
+      '<text class="kl" x="' + (KG.W - KG.R + 6) + '" y="' + (g.y(v) + 4).toFixed(1) + '">' + fnum(v, v >= 100 ? 0 : 2) + '</text>';
   }
-  var last = bars ? bars[n - 1][3] : cs[n - 1];
-  out += '<line class="kg klast" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(last).toFixed(1) + '" y2="' + y(last).toFixed(1) + '"/></svg>';
-  return '<div class="nlabel">' + (bars ? 'DAILY CANDLES' : 'DAILY CLOSES') + ' · LAST ' + n + ' SESSIONS' +
-    (q.d0 ? ' TO ' + esc(q.d0) : '') + '</div>' + out;
+  out += '<line class="kg" x1="' + KG.L + '" x2="' + (KG.W - KG.R) + '" y1="' + KG.VB + '" y2="' + KG.VB + '"/>' +
+    '<text class="kl" x="' + (KG.W - KG.R + 6) + '" y="' + (KG.VT + 4) + '">' + fvol(g.vmax) + '</text>';
+  // month ticks
+  var lastMon = '';
+  g.bars.forEach(function (b, i) {
+    var m = (b.d || '').slice(0, 7);
+    if (m && m !== lastMon) {
+      if (lastMon) out += '<text class="kl km" x="' + g.x(i).toFixed(1) + '" y="' + (KG.H - 6) + '">' + m.slice(5) + '/' + m.slice(2, 4) + '</text>';
+      lastMon = m;
+    }
+  });
+  var bw = Math.max(1.5, g.step * 0.62);
+  g.bars.forEach(function (b, i) {
+    var x = g.x(i), up = b.c >= b.o, cls = up ? 'up' : 'dn';
+    var top = g.y(Math.max(b.o, b.c)), bot = g.y(Math.min(b.o, b.c));
+    if (bot - top < 1) bot = top + 1;
+    out += '<line class="kw ' + cls + '" x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + g.y(b.h).toFixed(1) + '" y2="' + g.y(b.l).toFixed(1) + '"/>' +
+      '<rect class="kb ' + cls + '" x="' + (x - bw / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (bot - top).toFixed(1) + '"/>' +
+      '<rect class="kv ' + cls + '" x="' + (x - bw / 2).toFixed(1) + '" y="' + g.vy(b.v).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (KG.VB - g.vy(b.v)).toFixed(1) + '"/>';
+  });
+  [[20, K.ma20, 'kma20'], [50, K.ma50, 'kma50']].forEach(function (m) {
+    if (!m[1]) return;
+    var pts = [];
+    for (var i = 0; i < g.n; i++) {
+      var ai = g.start + i;
+      if (ai + 1 < m[0]) continue;
+      var s = 0;
+      for (var j = ai - m[0] + 1; j <= ai; j++) s += g.all[j].c;
+      pts.push(g.x(i).toFixed(1) + ',' + g.y(s / m[0]).toFixed(1));
+    }
+    if (pts.length > 1) out += '<polyline class="kma ' + m[2] + '" points="' + pts.join(' ') + '"/>';
+  });
+  var last = g.bars[g.n - 1].c;
+  out += '<line class="kg klast" x1="' + KG.L + '" x2="' + (KG.W - KG.R) + '" y1="' + g.y(last).toFixed(1) + '" y2="' + g.y(last).toFixed(1) + '"/>' +
+    '<rect class="kpl klastbox" x="' + (KG.W - KG.R + 2) + '" y="' + (g.y(last) - 8).toFixed(1) + '" width="' + (KG.R - 4) + '" height="16" rx="3"/>' +
+    '<text class="kpt" x="' + (KG.W - KG.R + 6) + '" y="' + (g.y(last) + 4).toFixed(1) + '">' + fnum(last, last >= 100 ? 0 : 2) + '</text>';
+  out += '<g class="kcross" style="display:none"><line class="kcx" y1="' + KG.T + '" y2="' + KG.VB + '"/><line class="kcy" x1="' + KG.L + '" x2="' + (KG.W - KG.R) + '"/>' +
+    '<rect class="kpl" x="' + (KG.W - KG.R + 2) + '" width="' + (KG.R - 4) + '" height="16" rx="3"/><text class="kpt" x="' + (KG.W - KG.R + 6) + '"></text></g></svg>';
+  var ctl = '<div class="kctl">' + KR.map(function (r) {
+    return '<button type="button" data-kr="' + r[0] + '"' + (r[0] === g.key ? ' class="on"' : '') + '>' + r[0] + '</button>';
+  }).join('') + '<span class="ksep"></span>' +
+    '<button type="button" data-kma="20"' + (K.ma20 ? ' class="on"' : '') + '><i class="kdot ma20"></i>MA20</button>' +
+    '<button type="button" data-kma="50"' + (K.ma50 ? ' class="on"' : '') + '><i class="kdot ma50"></i>MA50</button></div>';
+  return '<div class="kwrap" data-t="' + esc(t) + '"><div class="nlabel">DAILY CHART · ' + g.key + ' · ' + g.n + ' SESSIONS</div>' +
+    '<div class="klegend">' + kLegend(g.bars[g.n - 1], g.bars[g.n - 2]) + '</div>' + out + ctl + '</div>';
+}
+function kRedraw(t) {
+  var q = ((state.content.stocks || {}).P || {})[t];
+  document.querySelectorAll('.kwrap[data-t="' + t + '"]').forEach(function (w) { w.outerHTML = candleSVG(t, q); });
+}
+function kHover(svg, clientX) {
+  var t = svg.getAttribute('data-t'), q = ((state.content.stocks || {}).P || {})[t];
+  var g = kGeom(q, t);
+  if (!g) return;
+  var rect = svg.getBoundingClientRect();
+  if (!rect.width) return;
+  var x = (clientX - rect.left) / rect.width * KG.W;
+  var i = Math.max(0, Math.min(g.n - 1, Math.floor((x - KG.L) / g.step)));
+  var b = g.bars[i], cross = svg.querySelector('.kcross');
+  if (!b || !cross) return;
+  cross.style.display = '';
+  var cx = g.x(i).toFixed(1), cy = g.y(b.c).toFixed(1);
+  var lx = cross.querySelector('.kcx'), ly = cross.querySelector('.kcy'), box = cross.querySelector('.kpl'), txt = cross.querySelector('.kpt');
+  lx.setAttribute('x1', cx); lx.setAttribute('x2', cx);
+  ly.setAttribute('y1', cy); ly.setAttribute('y2', cy);
+  box.setAttribute('y', (g.y(b.c) - 8).toFixed(1));
+  txt.setAttribute('y', (g.y(b.c) + 4).toFixed(1));
+  txt.textContent = fnum(b.c, b.c >= 100 ? 0 : 2);
+  var legend = svg.parentNode.querySelector('.klegend');
+  if (legend) legend.innerHTML = kLegend(b, g.bars[i - 1] || g.all[g.start + i - 1]);
+}
+function kLeave(svg) {
+  var cross = svg.querySelector('.kcross');
+  if (cross) cross.style.display = 'none';
+  var t = svg.getAttribute('data-t'), q = ((state.content.stocks || {}).P || {})[t], g = kGeom(q, t);
+  var legend = svg.parentNode.querySelector('.klegend');
+  if (g && legend) legend.innerHTML = kLegend(g.bars[g.n - 1], g.bars[g.n - 2]);
 }
 function stockRow(e, P) {
   var q = (P || {})[e.t] || {};
@@ -381,7 +477,7 @@ function stockRow(e, P) {
   if (e.conf != null) meta += '<span class="schip2 num">CONF ' + esc(e.conf) + '%</span>';
   if (e.chgTag) meta += '<span class="schip2 chg">' + esc(e.chgTag) + '</span>';
 
-  var body = candleSVG(q);
+  var body = candleSVG(e.t, q);
   if (e.does) body += '<div class="nlabel">WHAT IT DOES</div><p>' + esc(e.does) + '</p>';
   if (e.edge) body += '<div class="nlabel">THE EDGE</div><p>' + esc(e.edge) + '</p>';
   if (e.why) body += '<div class="nlabel">WHY NOW</div><p>' + esc(e.why) + '</p>';
@@ -579,12 +675,35 @@ function enter() {
 /* ---------- wiring ---------- */
 window.addEventListener('hashchange', route);
 $('view').addEventListener('click', function (ev) {
-  var b = ev.target && ev.target.closest ? ev.target.closest('.savestar') : null;
-  if (!b) return;
-  ev.preventDefault();
-  toggleSaved(b.getAttribute('data-id'));
-  route();
+  var el = ev.target && ev.target.closest ? ev.target : null;
+  if (!el) return;
+  var b = el.closest('.savestar');
+  if (b) { ev.preventDefault(); toggleSaved(b.getAttribute('data-id')); route(); return; }
+  var kr = el.closest('[data-kr]');
+  if (kr) { ev.preventDefault(); var w = kr.closest('.kwrap'); K.range[w.getAttribute('data-t')] = kr.getAttribute('data-kr'); kRedraw(w.getAttribute('data-t')); return; }
+  var km = el.closest('[data-kma]');
+  if (km) {
+    ev.preventDefault();
+    if (km.getAttribute('data-kma') === '20') K.ma20 = !K.ma20; else K.ma50 = !K.ma50;
+    document.querySelectorAll('.kwrap').forEach(function (w) { kRedraw(w.getAttribute('data-t')); });
+  }
 });
+$('view').addEventListener('mousemove', function (ev) {
+  var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;
+  if (svg) kHover(svg, ev.clientX);
+});
+$('view').addEventListener('mouseout', function (ev) {
+  var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;
+  if (svg && !(ev.relatedTarget && svg.contains(ev.relatedTarget))) kLeave(svg);
+});
+$('view').addEventListener('touchstart', function (ev) {
+  var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;
+  if (svg && ev.touches[0]) kHover(svg, ev.touches[0].clientX);
+}, { passive: true });
+$('view').addEventListener('touchmove', function (ev) {
+  var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;
+  if (svg && ev.touches[0]) kHover(svg, ev.touches[0].clientX);
+}, { passive: true });
 $('unlock-btn').addEventListener('click', function () {
   var t = $('key-input').value.trim();
   if (t) tryUnlock(t, false);
