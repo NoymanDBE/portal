@@ -532,7 +532,12 @@ function stockRow(e, P) {
   if (e.conf != null) meta += '<span class="schip2 num">CONF ' + esc(e.conf) + '%</span>';
   if (e.chgTag) meta += '<span class="schip2 chg">' + esc(e.chgTag) + '</span>';
 
-  var body = candleSVG(e.t, q);
+  var inPort = portSet(state.content.stocks || { port: [] }).indexOf(e.t) >= 0;
+  var body = '<div class="sact">' + (inPort ?
+      '<button type="button" class="rmbtn" data-portrm="' + esc(e.t) + '">\u2212 Remove from portfolio</button>' :
+      '<button type="button" class="addbtn" data-portadd-t="' + esc(e.t) + '">+ Add to portfolio</button>') +
+    '<button type="button" class="addbtn' + (watchList().indexOf(e.t) >= 0 ? ' on' : '') + '" data-w="' + esc(e.t) + '">' + (watchList().indexOf(e.t) >= 0 ? '\u2605 Watching' : '\u2606 Watch') + '</button></div>' +
+    candleSVG(e.t, q);
   if (e.does) body += '<div class="nlabel">WHAT IT DOES</div><p>' + esc(e.does) + '</p>';
   if (e.edge) body += '<div class="nlabel">THE EDGE</div><p>' + esc(e.edge) + '</p>';
   if (e.why) body += '<div class="nlabel">WHY NOW</div><p>' + esc(e.why) + '</p>';
@@ -583,10 +588,29 @@ function stockRow(e, P) {
     '<span class="vpill ' + esc(e.v || '') + '">' + vlabel + '</span>' +
     sparkSVG(q.c) +
     '<span class="sr-px num">' + (q.last != null ? '$' + fnum(q.last) : '') + '</span>' +
-    chgPill(q.chg1d) + '</div>' +
+    chgPill(q.chg1d) +
+    '<button type="button" class="wstar' + (watchList().indexOf(e.t) >= 0 ? ' on' : '') + '" data-w="' + esc(e.t) + '" aria-label="Watch" title="' + (watchList().indexOf(e.t) >= 0 ? 'Remove from watchlist' : 'Add to watchlist') + '">' + (watchList().indexOf(e.t) >= 0 ? '★' : '☆') + '</button></div>' +
     '<div class="sr-meta">' + meta + '</div>' +
     (e.gist ? '<div class="sr-gist">' + esc(e.gist) + '</div>' : '') +
     '</summary><div class="nbody">' + body + '</div></details>';
+}
+var REPO_ISSUES = 'https://github.com/NoymanDBE/portal/issues/new';
+function lsGet(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function watchList() { return lsGet('watch_v1', []); }
+function toggleWatch(t) { var w = watchList(); var i = w.indexOf(t); if (i < 0) w.push(t); else w.splice(i, 1); lsSet('watch_v1', w); }
+function portLocal() { var v = lsGet('port_local_v1', {}); return { add: v.add || [], rm: v.rm || [] }; }
+function portSet(s) {
+  var loc = portLocal(), out = [];
+  (s.port || []).concat(loc.add).forEach(function (t) { if (out.indexOf(t) < 0 && loc.rm.indexOf(t) < 0) out.push(t); });
+  return out;
+}
+function portAdd(t) { var loc = portLocal(); t = String(t || '').toUpperCase().replace(/[^A-Z0-9.\-]/g, ''); if (!t) return; loc.rm = loc.rm.filter(function (x) { return x !== t; }); if (loc.add.indexOf(t) < 0) loc.add.push(t); lsSet('port_local_v1', loc); }
+function portRemove(t) { var loc = portLocal(); loc.add = loc.add.filter(function (x) { return x !== t; }); if (loc.rm.indexOf(t) < 0) loc.rm.push(t); lsSet('port_local_v1', loc); }
+function issueLink(kind, t) {
+  var title = kind + ' ' + t;
+  var body = (kind === 'ADD' ? 'Please add ' + t + ' to my portfolio and analyze it in the next morning scan.' : 'Please remove ' + t + ' from my portfolio.') + '\n\n(filed from the portal)';
+  return REPO_ISSUES + '?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
 }
 function stocksSubtabs(s, sub) {
   var scan = s.C.filter(function (c) { return s.port.indexOf(c.t) < 0; });
@@ -597,7 +621,7 @@ function stocksSubtabs(s, sub) {
   }
   return '<nav class="subtabs">' + tab('', 'Board', scan.length) +
     tab('buy', 'Buy', n('buy')) + tab('wait', 'Wait', n('wait')) + tab('refrain', 'Refrain', n('refrain')) +
-    tab('portfolio', 'My Portfolio', s.port.length) + tab('dropped', 'Dropped', s.aside.length) + '</nav>';
+    tab('portfolio', 'My Portfolio', portSet(s).length) + tab('watch', '★ Watchlist', watchList().length) + tab('dropped', 'Dropped', s.aside.length) + '</nav>';
 }
 function stripHTML(s) {
   var tiles = (s.strip || []).map(function (t) {
@@ -610,7 +634,7 @@ function stripHTML(s) {
   return tiles ? '<div class="mstrip2">' + tiles + '</div>' : '';
 }
 function stocksHTML(s, sub) {
-  var known = { '': 1, buy: 1, wait: 1, refrain: 1, portfolio: 1, dropped: 1 };
+  var known = { '': 1, buy: 1, wait: 1, refrain: 1, portfolio: 1, watch: 1, dropped: 1 };
   if (!known[sub]) sub = '';
   var scan = s.C.filter(function (c) { return s.port.indexOf(c.t) < 0; });
   var byT = {};
@@ -629,7 +653,26 @@ function stocksHTML(s, sub) {
     }
     body += group('buy', 'BUY') + group('wait', 'WAIT') + group('refrain', 'REFRAIN');
   } else if (sub === 'portfolio') {
-    body += rows(s.port.map(function (t) { return byT[t]; }).filter(Boolean));
+    var pset = portSet(s);
+    body += '<form class="portadd" autocomplete="off"><input id="port-q" name="q" list="tick-list" placeholder="Add a ticker \u2014 e.g. NVDA" maxlength="12">' +
+      '<datalist id="tick-list">' + s.C.map(function (c) { return '<option value="' + esc(c.t) + '">' + esc(c.n || '') + '</option>'; }).join('') + '</datalist>' +
+      '<button type="submit" data-portadd="1">Add</button></form>';
+    if (!pset.length) body += '<p class="scempty">Your portfolio is empty \u2014 add a ticker above.</p>';
+    var pending = [];
+    pset.forEach(function (t) {
+      if (byT[t]) body += stockRow(byT[t], s.P);
+      else pending.push(t);
+    });
+    if (pending.length) {
+      body += '<div class="nlabel">AWAITING ANALYSIS</div>' + pending.map(function (t) {
+        return '<div class="pend"><span class="pend-t num">' + esc(t) + '</span><span class="pend-x">Not on the board yet \u2014 the 06:00 scan analyzes requested tickers. ' +
+          '<a href="' + issueLink('ADD', t) + '" target="_blank" rel="noopener noreferrer">Request analysis \u2197</a> (or just tell Claude).</span>' +
+          '<button type="button" class="rmbtn" data-portrm="' + esc(t) + '">Remove</button></div>';
+      }).join('');
+    }
+  } else if (sub === 'watch') {
+    var wl = watchList().map(function (t) { return byT[t]; }).filter(Boolean);
+    body += wl.length ? rows(wl) : '<p class="scempty">Nothing on your watchlist yet \u2014 tap the \u2606 on any company to follow it here.</p>';
   } else if (sub === 'dropped') {
     body += '<div class="nlabel">DROPPED FROM THE BOARD</div>' +
       rows(s.aside.map(function (t) { return byT[t]; }).filter(Boolean));
@@ -736,6 +779,12 @@ $('view').addEventListener('click', function (ev) {
   if (b) { ev.preventDefault(); toggleSaved(b.getAttribute('data-id')); route(); return; }
   var kr = el.closest('[data-kr]');
   if (kr) { ev.preventDefault(); var w = kr.closest('.kwrap'); K.range[w.getAttribute('data-t')] = kr.getAttribute('data-kr'); kRedraw(w.getAttribute('data-t')); return; }
+  var ws = el.closest('[data-w]');
+  if (ws) { ev.preventDefault(); toggleWatch(ws.getAttribute('data-w')); route(); return; }
+  var pa = el.closest('[data-portadd-t]');
+  if (pa) { ev.preventDefault(); portAdd(pa.getAttribute('data-portadd-t')); route(); return; }
+  var pr = el.closest('[data-portrm]');
+  if (pr) { ev.preventDefault(); portRemove(pr.getAttribute('data-portrm')); route(); return; }
   var ss = el.closest('[data-ssort]');
   if (ss) { ev.preventDefault(); SH.sort = ss.getAttribute('data-ssort'); route(); return; }
   var sr = el.closest('[data-sref]');
@@ -746,6 +795,14 @@ $('view').addEventListener('click', function (ev) {
     if (km.getAttribute('data-kma') === '20') K.ma20 = !K.ma20; else K.ma50 = !K.ma50;
     document.querySelectorAll('.kwrap').forEach(function (w) { kRedraw(w.getAttribute('data-t')); });
   }
+});
+$('view').addEventListener('submit', function (ev) {
+  var f = ev.target && ev.target.closest ? ev.target.closest('form.portadd') : null;
+  if (!f) return;
+  ev.preventDefault();
+  var inp = f.querySelector('input');
+  var t = (inp.value || '').trim().toUpperCase();
+  if (t) { portAdd(t); inp.value = ''; route(); }
 });
 $('view').addEventListener('mousemove', function (ev) {
   var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;

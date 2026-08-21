@@ -314,3 +314,20 @@ details.shrow .savestar:hover,details.shrow .savestar.on{color:var(--warn)}
 .shsrc{font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .shctry{font-size:12px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .shmain{gap:3px}
+
+/* ---- portfolio + watchlist controls ---- */
+.wstar{width:34px;height:34px;border-radius:9px;font-size:18px;line-height:1;color:var(--text-3);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.wstar:hover,.wstar.on{color:var(--warn)}
+.sact{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.addbtn,.rmbtn{font:600 12.5px/1 var(--sans);border-radius:8px;padding:9px 12px;border:1px solid var(--hair);color:var(--text-1);background:var(--bg-2)}
+.addbtn:hover{border-color:var(--stocks)}
+.addbtn.on{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,transparent)}
+.rmbtn:hover{color:var(--bad);border-color:var(--bad)}
+.portadd{display:flex;gap:8px;margin:14px 0 12px}
+.portadd input{flex:1;min-width:0;font:15px var(--mono);text-transform:uppercase;color:var(--text-1);background:var(--bg-1);border:1px solid var(--hair);border-radius:10px;padding:11px 13px}
+.portadd input:focus{outline:2px solid var(--stocks);outline-offset:1px}
+.portadd button{font:700 13px/1 var(--sans);color:#08090A;background:var(--stocks);border:none;border-radius:10px;padding:0 18px;min-height:44px}
+.pend{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;background:var(--bg-1);border:1px solid var(--hair);border-left:3px solid var(--warn);border-radius:10px;padding:10px 12px;margin:8px 0}
+.pend-t{font-weight:800;font-size:15px}
+.pend-x{font-size:13px;color:var(--text-2);line-height:1.5}
+.pend-x a{color:var(--stocks);font-weight:600}
