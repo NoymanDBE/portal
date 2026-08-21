@@ -223,6 +223,11 @@ function costGrid(costs) {
   if (!rows) return '';
   return '<div class="costgrid"><div class="cg-r cg-h"><span></span><span>Ship</span><span>Import</span><span>All-in</span></div>' + rows + '</div>';
 }
+function flagOf(iso) {
+  iso = String(iso || '').toUpperCase();
+  if (!/^[A-Z]{2}$/.test(iso)) return '🌐';
+  return String.fromCodePoint(0x1F1E6 + iso.charCodeAt(0) - 65, 0x1F1E6 + iso.charCodeAt(1) - 65);
+}
 function shopCard(it, saved) {
   var img = (it.img && it.img.indexOf('data:image/') === 0) ?
     '<img class="shthumb" src="' + it.img + '" alt="" loading="lazy">' :
@@ -231,18 +236,24 @@ function shopCard(it, saved) {
     var cls = /deal/i.test(f) ? ' good' : (/fake|above market|no coa|no longer|unverified/i.test(f) ? ' warn' : '');
     return '<span class="fchip2' + cls + '">' + esc(f) + '</span>';
   }).join('');
-  var topFlag = (it.flags || [])[0];
+  var topFlag = it.ref || (it.flags || [])[0];
   var star = '<button class="savestar num' + (saved ? ' on' : '') + '" data-id="' + esc(it.id) + '" aria-label="Save item" title="' +
     (saved ? 'Remove from saved' : 'Save this item') + '">' + (saved ? '★' : '☆') + '</button>';
+  var src = it.src || String(it.origin || it.site || '').replace(/\s*\([^)]*\)\s*$/, '').split(',')[0].trim() || it.site || '';
+  var ctry = it.country ? flagOf(it.country) + ' ' + esc(it.countryName || it.country) : '🌐 Ship-from country not stated';
+  var ships = (it.ships || []).length ? '<span class="schip2">Ships to: ' + it.ships.map(esc).join(' · ') + '</span>' : '';
   return '<details class="shrow" data-pu="' + (it.pu != null ? it.pu : '') + '">' +
     '<summary>' + img +
     '<span class="shmain"><span class="sht">' + esc(it.t) + '</span>' +
-    '<span class="shsub">' + (it.ref ? '<b>' + esc(it.ref) + '</b> · ' : '') + esc(it.origin || it.site) + (it.cond ? ' · ' + esc(it.cond) : '') + '</span></span>' +
+    '<span class="shsrc">' + esc(src) + '</span>' +
+    '<span class="shctry">' + ctry + '</span></span>' +
     (it.is_new ? '<span class="newbdg2">NEW</span>' : '') +
     (topFlag ? '<span class="fchip2' + (/deal/i.test(topFlag) ? ' good' : (/fake|above market|no coa|no longer|unverified/i.test(topFlag) ? ' warn' : '')) + ' shflag">' + esc(topFlag) + '</span>' : '') +
     '<span class="shp num">' + esc(it.p) + '</span>' + star +
     '</summary>' +
     '<div class="shbody">' +
+    '<div class="scmeta">' + (it.cond ? '<span class="schip2">Condition: ' + esc(it.cond) + '</span>' : '') +
+    (it.origin ? '<span class="schip2">' + esc(it.origin) + '</span>' : '') + ships + '</div>' +
     costGrid(it.costs) +
     (flags ? '<div class="scmeta">' + flags + '</div>' : '') +
     (it.notes ? '<p class="scnotes">' + esc(it.notes) + '</p>' : '') +

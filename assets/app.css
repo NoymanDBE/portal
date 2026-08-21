@@ -309,3 +309,8 @@ details.shrow .savestar:hover,details.shrow .savestar.on{color:var(--warn)}
 .shsort-l{font:600 11px/1 var(--mono);letter-spacing:.08em;color:var(--text-3);margin-right:2px}
 :root[data-theme="light"] .shrefs button.on{color:#fff}
 .shsub b{color:var(--text-2);font-weight:700}
+
+/* ---- shopping row: source + country lines ---- */
+.shsrc{font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shctry{font-size:12px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shmain{gap:3px}
