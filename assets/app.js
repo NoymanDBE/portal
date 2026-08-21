@@ -237,7 +237,7 @@ function shopCard(it, saved) {
   return '<details class="shrow">' +
     '<summary>' + img +
     '<span class="shmain"><span class="sht">' + esc(it.t) + '</span>' +
-    '<span class="shsub">' + esc(it.origin || it.site) + (it.cond ? ' · ' + esc(it.cond) : '') + '</span></span>' +
+    '<span class="shsub">' + (it.ref ? '<b>' + esc(it.ref) + '</b> · ' : '') + esc(it.origin || it.site) + (it.cond ? ' · ' + esc(it.cond) : '') + '</span></span>' +
     (it.is_new ? '<span class="newbdg2">NEW</span>' : '') +
     (topFlag ? '<span class="fchip2' + (/deal/i.test(topFlag) ? ' good' : (/fake|above market|no coa|no longer|unverified/i.test(topFlag) ? ' warn' : '')) + ' shflag">' + esc(topFlag) + '</span>' : '') +
     '<span class="shp num">' + esc(it.p) + '</span>' + star +
@@ -251,6 +251,33 @@ function shopCard(it, saved) {
     (it.chk ? ' · checked ' + esc(it.chk) : '') + '</span>' +
     '<a class="sclink" href="' + esc(it.u) + '" target="_blank" rel="noopener noreferrer">View listing ↗</a></div>' +
     '</div></details>';
+}
+var SH = { sort: 'best', ref: {} };
+var SH_SORTS = [['best', 'Best first'], ['asc', 'Price ↑'], ['desc', 'Price ↓'], ['il', 'All-in to IL ↑']];
+function shSort(list) {
+  var l = list.slice();
+  var ilTot = function (it) { var c = (it.costs || {}).IL; return (c && !c.na && c.tot != null) ? c.tot : Infinity; };
+  if (SH.sort === 'asc') l.sort(function (a, b) { return (a.pu || 0) - (b.pu || 0); });
+  else if (SH.sort === 'desc') l.sort(function (a, b) { return (b.pu || 0) - (a.pu || 0); });
+  else if (SH.sort === 'il') l.sort(function (a, b) { return ilTot(a) - ilTot(b); });
+  return l;
+}
+function shTools(sid, list) {
+  var refs = [];
+  list.forEach(function (it) { if (it.ref && refs.indexOf(it.ref) < 0) refs.push(it.ref); });
+  var cur = SH.ref[sid] || 'all';
+  var out = '<div class="shtools">';
+  if (refs.length > 1) {
+    out += '<div class="shrefs"><button type="button" data-sref="all"' + (cur === 'all' ? ' class="on"' : '') + '>All · ' + list.length + '</button>' +
+      refs.map(function (r) {
+        var n = list.filter(function (it) { return it.ref === r; }).length;
+        return '<button type="button" data-sref="' + esc(r) + '"' + (cur === r ? ' class="on"' : '') + '>' + esc(r) + ' · ' + n + '</button>';
+      }).join('') + '</div>';
+  }
+  out += '<div class="shsort"><span class="shsort-l">Sort</span>' + SH_SORTS.map(function (o) {
+    return '<button type="button" data-ssort="' + o[0] + '"' + (SH.sort === o[0] ? ' class="on"' : '') + '>' + o[1] + '</button>';
+  }).join('') + '</div></div>';
+  return out;
 }
 function shoppingHTML(s, sub) {
   var live = (s.items || []).filter(function (it) { return !it.gone; });
@@ -270,9 +297,25 @@ function shoppingHTML(s, sub) {
     (s.searches || []).map(function (q) { return tab(q.id, q.name, (bySid[q.id] || []).length); }).join('') +
     tab('saved', '★ Saved', savedIds.length) + '</nav>';
   var body = '';
-  function grid(list) {
-    return list.length ? '<div class="shoplist">' + list.map(function (it) { return shopCard(it, !!saved[it.id]); }).join('') + '</div>' :
-      '<p class="scempty">No live finds for this hunt right now — the robot keeps looking every morning.</p>';
+  function rows(list) { return '<div class="shoplist">' + list.map(function (it) { return shopCard(it, !!saved[it.id]); }).join('') + '</div>'; }
+  function grid(list, sid) {
+    if (!list.length) return '<p class="scempty">No live finds for this hunt right now — the robot keeps looking every morning.</p>';
+    var out = shTools(sid, list);
+    var cur = SH.ref[sid] || 'all';
+    var hasRefs = list.some(function (it) { return it.ref; });
+    if (hasRefs && cur === 'all') {
+      var refs = [];
+      list.forEach(function (it) { if (it.ref && refs.indexOf(it.ref) < 0) refs.push(it.ref); });
+      refs.forEach(function (r) {
+        var sub = shSort(list.filter(function (it) { return it.ref === r; }));
+        out += '<div class="ngroup"><span>' + esc(r) + ' · ' + sub.length + '</span></div>' + rows(sub);
+      });
+      var noref = shSort(list.filter(function (it) { return !it.ref; }));
+      if (noref.length) out += '<div class="ngroup"><span>Other · ' + noref.length + '</span></div>' + rows(noref);
+      return out;
+    }
+    var flt = hasRefs ? list.filter(function (it) { return it.ref === cur; }) : list;
+    return out + (flt.length ? rows(shSort(flt)) : '<p class="scempty">Nothing live for this reference right now.</p>');
   }
   if (sub === 'saved') {
     var liveIds = {};
@@ -286,12 +329,12 @@ function shoppingHTML(s, sub) {
       }
       return it;
     });
-    body = list.length ? '<div class="shoplist">' + list.map(function (it) { return shopCard(it, true); }).join('') + '</div>' :
+    body = list.length ? shTools('saved', list) + '<div class="shoplist">' + shSort(list).map(function (it) { return shopCard(it, true); }).join('') + '</div>' :
       '<p class="scempty">Nothing saved yet — hit the ☆ on any find to keep it here.</p>';
   } else {
     var q = (s.searches || []).filter(function (x) { return x.id === sub; })[0] || {};
     if (q.notes) body += '<p class="scandate">' + esc(q.notes) + '</p>';
-    body += grid(bySid[sub] || []);
+    body += grid(bySid[sub] || [], sub);
   }
   return '<article class="paper shop"><div class="edline">SHOPPING SCOUT' +
     (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' + subtabs + body +
@@ -681,6 +724,10 @@ $('view').addEventListener('click', function (ev) {
   if (b) { ev.preventDefault(); toggleSaved(b.getAttribute('data-id')); route(); return; }
   var kr = el.closest('[data-kr]');
   if (kr) { ev.preventDefault(); var w = kr.closest('.kwrap'); K.range[w.getAttribute('data-t')] = kr.getAttribute('data-kr'); kRedraw(w.getAttribute('data-t')); return; }
+  var ss = el.closest('[data-ssort]');
+  if (ss) { ev.preventDefault(); SH.sort = ss.getAttribute('data-ssort'); route(); return; }
+  var sr = el.closest('[data-sref]');
+  if (sr) { ev.preventDefault(); var cs = parseRoute().sub || ''; SH.ref[cs] = sr.getAttribute('data-sref'); route(); return; }
   var km = el.closest('[data-kma]');
   if (km) {
     ev.preventDefault();

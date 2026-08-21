@@ -299,3 +299,13 @@ details.shrow .savestar:hover,details.shrow .savestar.on{color:var(--warn)}
 .ksep{width:1px;height:16px;background:var(--hair);margin:0 4px}
 .kdot{width:14px;height:2px;display:inline-block;border-radius:1px}
 .kdot.ma20{background:var(--stocks)}.kdot.ma50{background:var(--news)}
+
+/* ---- shopping tools: reference groups + sort ---- */
+.shtools{display:flex;flex-direction:column;gap:8px;margin:12px 0 4px}
+.shrefs,.shsort{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.shrefs button,.shsort button{font:600 12px/1 var(--sans);color:var(--text-2);background:var(--bg-2);border:1px solid var(--hair);border-radius:999px;padding:7px 11px}
+.shrefs button.on{color:#08090A;background:var(--shop);border-color:var(--shop)}
+.shsort button.on{color:var(--text-1);border-color:var(--shop);background:color-mix(in srgb,var(--shop) 14%,transparent)}
+.shsort-l{font:600 11px/1 var(--mono);letter-spacing:.08em;color:var(--text-3);margin-right:2px}
+:root[data-theme="light"] .shrefs button.on{color:#fff}
+.shsub b{color:var(--text-2);font-weight:700}
