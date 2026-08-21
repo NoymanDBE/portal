@@ -72,7 +72,8 @@ function loadBlob(product) {
   if (state.content[product]) return Promise.resolve(state.content[product]);
   var rel = state.manifest.files[product];
   if (!rel) return Promise.reject({ step: 'missing' });
-  return fetch(BASE + rel).then(function (r) {
+  var ver = encodeURIComponent((state.manifest && state.manifest.generated_at) || Date.now());
+  return fetch(BASE + rel + '?v=' + ver, { cache: 'no-store' }).then(function (r) {
     if (!r.ok) throw { step: 'blob', status: r.status };
     return r.json();
   }).then(function (env) {
