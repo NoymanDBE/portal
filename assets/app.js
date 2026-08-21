@@ -234,7 +234,7 @@ function shopCard(it, saved) {
   var topFlag = (it.flags || [])[0];
   var star = '<button class="savestar num' + (saved ? ' on' : '') + '" data-id="' + esc(it.id) + '" aria-label="Save item" title="' +
     (saved ? 'Remove from saved' : 'Save this item') + '">' + (saved ? '★' : '☆') + '</button>';
-  return '<details class="shrow">' +
+  return '<details class="shrow" data-pu="' + (it.pu != null ? it.pu : '') + '">' +
     '<summary>' + img +
     '<span class="shmain"><span class="sht">' + esc(it.t) + '</span>' +
     '<span class="shsub">' + (it.ref ? '<b>' + esc(it.ref) + '</b> · ' : '') + esc(it.origin || it.site) + (it.cond ? ' · ' + esc(it.cond) : '') + '</span></span>' +
