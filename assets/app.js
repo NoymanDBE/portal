@@ -331,6 +331,43 @@ function meterHTML(label, val, max) {
     '<span class="mtr2-t"><span class="mtr2-f' + cls + '" style="width:' + p.toFixed(0) + '%"></span></span>' +
     '<span class="mtr2-n num">' + esc(val) + '</span></div>';
 }
+function candleSVG(q) {
+  var W = 640, H = 260, L = 8, R = 58, T = 10, B = 14;
+  var pw = W - L - R, ph = H - T - B;
+  var bars = (q && q.ohlc && q.ohlc.length > 5) ? q.ohlc.slice(-90) : null;
+  var cs = (!bars && q && q.c && q.c.length > 5) ? q.c.slice(-90) : null;
+  if (!bars && !cs) return '';
+  var n = bars ? bars.length : cs.length, lo = Infinity, hi = -Infinity;
+  if (bars) bars.forEach(function (b) { if (b[2] < lo) lo = b[2]; if (b[1] > hi) hi = b[1]; });
+  else cs.forEach(function (c) { if (c < lo) lo = c; if (c > hi) hi = c; });
+  var span = (hi - lo) || 1;
+  var y = function (v) { return T + (hi - v) * ph / span; };
+  var step = pw / n, bw = Math.max(2, step * 0.62);
+  var out = '<svg class="kchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Daily candles, last ' + n + ' sessions">';
+  for (var g = 0; g <= 4; g++) {
+    var v = lo + span * g / 4, yy = y(v).toFixed(1);
+    out += '<line class="kg" x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '"/>' +
+      '<text class="kl" x="' + (W - R + 6) + '" y="' + (y(v) + 4).toFixed(1) + '">' + fnum(v, v >= 100 ? 0 : 2) + '</text>';
+  }
+  if (bars) {
+    bars.forEach(function (b, i) {
+      var o = b[0], h = b[1], l = b[2], c = b[3], x = L + i * step + step / 2, up = c >= o;
+      var top = y(Math.max(o, c)), bot = y(Math.min(o, c));
+      if (bot - top < 1) bot = top + 1;
+      var cls = up ? 'up' : 'dn';
+      out += '<line class="kw ' + cls + '" x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + y(h).toFixed(1) + '" y2="' + y(l).toFixed(1) + '"/>' +
+        '<rect class="kb ' + cls + '" x="' + (x - bw / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + (bot - top).toFixed(1) + '"/>';
+    });
+  } else {
+    out += '<polyline class="kline" points="' + cs.map(function (c, i) {
+      return (L + i * step + step / 2).toFixed(1) + ',' + y(c).toFixed(1);
+    }).join(' ') + '"/>';
+  }
+  var last = bars ? bars[n - 1][3] : cs[n - 1];
+  out += '<line class="kg klast" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(last).toFixed(1) + '" y2="' + y(last).toFixed(1) + '"/></svg>';
+  return '<div class="nlabel">' + (bars ? 'DAILY CANDLES' : 'DAILY CLOSES') + ' · LAST ' + n + ' SESSIONS' +
+    (q.d0 ? ' TO ' + esc(q.d0) : '') + '</div>' + out;
+}
 function stockRow(e, P) {
   var q = (P || {})[e.t] || {};
   var vlabel = { buy: 'BUY', wait: 'WAIT', refrain: 'REFRAIN' }[e.v] || esc(e.v || '');
@@ -344,10 +381,12 @@ function stockRow(e, P) {
   if (e.conf != null) meta += '<span class="schip2 num">CONF ' + esc(e.conf) + '%</span>';
   if (e.chgTag) meta += '<span class="schip2 chg">' + esc(e.chgTag) + '</span>';
 
-  var body = '';
+  var body = candleSVG(q);
   if (e.does) body += '<div class="nlabel">WHAT IT DOES</div><p>' + esc(e.does) + '</p>';
   if (e.edge) body += '<div class="nlabel">THE EDGE</div><p>' + esc(e.edge) + '</p>';
   if (e.why) body += '<div class="nlabel">WHY NOW</div><p>' + esc(e.why) + '</p>';
+  if (e.ta) body += '<div class="nlabel">THE TAPE</div><p>' + esc(e.ta) + '</p>';
+  if (e.fund) body += '<div class="nlabel">THE BOOKS</div><p>' + esc(e.fund) + '</p>';
   if (e.verdict) body += '<div class="nlabel">THE VERDICT</div>' + paras(e.verdict);
   if (e.bear) body += '<div class="nlabel dis">THE BEAR CASE</div><div class="dispbox">' + paras(e.bear) + '</div>';
   if (e.ev) body += '<div class="nlabel">THE EVIDENCE</div>' + paras(e.ev);
@@ -495,8 +534,7 @@ function newsSubtabs(n, sub) {
       (cnt != null ? ' <span class="num">' + cnt + '</span>' : '') + '</a>';
   }
   return '<nav class="subtabs">' + tab('', 'Overview') +
-    secs.map(function (s) { return tab(s.id, s.label, secCount(s)); }).join('') +
-    tab('markets', 'Markets') + tab('briefs', 'Briefs') + '</nav>';
+    secs.map(function (s) { return tab(s.id, s.label, secCount(s)); }).join('') + '</nav>';
 }
 function newsOverviewHTML(n) {
   var out = '<div class="nlabel">THE KEY POINTS</div>';
@@ -516,38 +554,13 @@ function newsSectionHTML(s) {
   });
   return out;
 }
-function newsMarketsHTML(n) {
-  var out = '<div class="nlabel">MARKETS</div><div class="mtable">';
-  out += (n.markets || []).map(function (m) {
-    var dir = /^-|down/i.test(m.c || '') ? 'dn' : (/^\+|up/i.test(m.c || '') ? 'up' : '');
-    return '<div class="mrow"><span class="mrn">' + esc(m.n) + '</span><span class="mrv num">' + esc(m.v) + '</span>' +
-      '<span class="mrc num ' + dir + '">' + esc(m.c) + '</span><span class="mrd num">' + esc(m.d || '') + '</span></div>';
-  }).join('');
-  out += '</div>';
-  if (n.mktNote) out += '<div class="nlabel">ABOUT THESE NUMBERS</div><p class="mnotep">' + esc(n.mktNote) + '</p>';
-  return out;
-}
-function newsBriefsHTML(n) {
-  var out = '<div class="nlabel">IN ONE LINE</div><ul class="briefs">' +
-    (n.brief || []).map(function (b) { return '<li>' + esc(b) + '</li>'; }).join('') + '</ul>';
-  if ((n.archive || []).length) {
-    out += '<details class="allsrc arch"><summary>PAST EDITIONS (' + n.archive.length + ')</summary>' +
-      n.archive.map(function (d) {
-        return '<div class="archday"><b>' + esc(d.d) + '</b><ul>' + (d.top || []).map(function (h) { return '<li>' + esc(h) + '</li>'; }).join('') + '</ul></div>';
-      }).join('') + '</details>';
-  }
-  out += '<div class="caughtup">You’re caught up. Next edition ~04:50.</div>';
-  return out;
-}
 function newsHTML(n, sub) {
   var secs = n.sections || [];
-  var known = { '': 1, markets: 1, briefs: 1 };
+  var known = { '': 1 };
   secs.forEach(function (s) { known[s.id] = 1; });
   if (!known[sub]) sub = '';
   var body;
   if (sub === '') body = newsOverviewHTML(n);
-  else if (sub === 'markets') body = newsMarketsHTML(n);
-  else if (sub === 'briefs') body = newsBriefsHTML(n);
   else body = newsSectionHTML(secs.filter(function (s) { return s.id === sub; })[0]);
   return '<article class="paper"><div class="edline">' + esc(n.edition_line || '') + '</div>' +
     newsSubtabs(n, sub) + body + '</article>';
