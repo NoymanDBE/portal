@@ -78,6 +78,8 @@ stocks = {
     "gist": gist, "tally": tally,
     "strip": STRIP, "port": PORT, "aside": ASIDE,
     "C": C, "P": P,
+    "ledger": (_st.get("LEDGER", []) if STATE_MODE else []),
+    "lessons": (_st.get("LESSONS", []) if STATE_MODE else []),
 }
 
 os.makedirs(os.path.join(ROOT, "data", today), exist_ok=True)

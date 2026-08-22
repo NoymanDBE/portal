@@ -331,3 +331,18 @@ details.shrow .savestar:hover,details.shrow .savestar.on{color:var(--warn)}
 .pend-t{font-weight:800;font-size:15px}
 .pend-x{font-size:13px;color:var(--text-2);line-height:1.5}
 .pend-x a{color:var(--stocks);font-weight:600}
+
+/* ---- buy-only board: call box, targets, record ---- */
+.tgtc{color:var(--stocks);border-color:color-mix(in srgb,var(--stocks) 55%,transparent);font-weight:700}
+.callbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--hair);border:1px solid var(--hair);border-radius:10px;overflow:hidden;margin-bottom:12px}
+.callbox>div{background:var(--bg-1);padding:9px 12px;display:flex;flex-direction:column;gap:2px}
+.cb-l{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3)}
+.callbox b{font-size:15px;font-weight:800}
+.ledger{display:flex;flex-direction:column;gap:6px}
+.ledrow{display:grid;grid-template-columns:88px 60px auto 1fr auto auto;gap:8px 12px;align-items:center;background:var(--bg-1);border:1px solid var(--hair);border-radius:10px;padding:9px 12px;font-size:13px}
+.ledrow.closed{opacity:.75}
+.led-d{color:var(--text-3);font-size:12px}
+.led-t{font-weight:800}
+.led-mv{font-weight:700}
+.led-n{grid-column:1/-1;font-size:12.5px;color:var(--text-2);line-height:1.45}
+@media (max-width:600px){.ledrow{grid-template-columns:80px 56px auto 1fr;}.led-mv,.ledrow .fchip2{grid-column:span 2}}

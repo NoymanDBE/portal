@@ -528,7 +528,7 @@ function stockRow(e, P) {
   if (sincePct != null) meta += '<span class="schip2 num ' + (sincePct >= 0 ? 'upc' : 'dnc') + '">' +
     fpct(sincePct) + ' <i>since pick</i></span>';
   if (e.feas && e.feas.p != null) meta += '<span class="schip2 num">FEAS ' + esc(e.feas.p) + '%</span>';
-  if (e.tgt != null) meta += '<span class="schip2 num">EV $' + fnum(e.tgt) + (e.tgtPct != null ? ' (' + fpct(e.tgtPct) + ')' : '') + '</span>';
+  if (e.tgt != null) meta += '<span class="schip2 tgtc num">TARGET $' + fnum(e.tgt) + (e.tgtPct != null ? ' (' + fpct(e.tgtPct) + ')' : '') + '</span>';
   if (e.conf != null) meta += '<span class="schip2 num">CONF ' + esc(e.conf) + '%</span>';
   if (e.chgTag) meta += '<span class="schip2 chg">' + esc(e.chgTag) + '</span>';
 
@@ -537,7 +537,7 @@ function stockRow(e, P) {
       '<button type="button" class="rmbtn" data-portrm="' + esc(e.t) + '">\u2212 Remove from portfolio</button>' :
       '<button type="button" class="addbtn" data-portadd-t="' + esc(e.t) + '">+ Add to portfolio</button>') +
     '<button type="button" class="addbtn' + (watchList().indexOf(e.t) >= 0 ? ' on' : '') + '" data-w="' + esc(e.t) + '">' + (watchList().indexOf(e.t) >= 0 ? '\u2605 Watching' : '\u2606 Watch') + '</button></div>' +
-    candleSVG(e.t, q);
+    callBox(e, q) + candleSVG(e.t, q);
   if (e.does) body += '<div class="nlabel">WHAT IT DOES</div><p>' + esc(e.does) + '</p>';
   if (e.edge) body += '<div class="nlabel">THE EDGE</div><p>' + esc(e.edge) + '</p>';
   if (e.why) body += '<div class="nlabel">WHY NOW</div><p>' + esc(e.why) + '</p>';
@@ -579,6 +579,7 @@ function stockRow(e, P) {
     body += '<div class="nlabel">WATCHING</div><ul class="keypts sm">' +
       e.watch.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
   }
+  if (e.drop_reason) body += '<div class="nlabel dis">WHY IT IS NOT A BUY</div><div class="dispbox"><p>' + esc(e.drop_reason) + '</p></div>';
   if (e.note) body += '<p class="snote">' + esc(e.note) + '</p>';
 
   return '<details class="srow v-' + esc(e.v || '') + '">' +
@@ -612,6 +613,41 @@ function issueLink(kind, t) {
   var body = (kind === 'ADD' ? 'Please add ' + t + ' to my portfolio and analyze it in the next morning scan.' : 'Please remove ' + t + ' from my portfolio.') + '\n\n(filed from the portal)';
   return REPO_ISSUES + '?title=' + encodeURIComponent(title) + '&body=' + encodeURIComponent(body);
 }
+function callBox(e, q) {
+  if (e.tgt == null) return '';
+  var last = (q || {}).last, up = (last && e.tgt) ? (e.tgt / last - 1) * 100 : e.tgtPct;
+  var since = (e.since && e.since.px && last) ? (last / e.since.px - 1) * 100 : null;
+  return '<div class="callbox">' +
+    '<div><span class="cb-l">Price target</span><b class="num">$' + fnum(e.tgt) + '</b></div>' +
+    '<div><span class="cb-l">Upside from here</span><b class="num ' + (up >= 0 ? 'upc' : 'dnc') + '">' + fpct(up) + '</b></div>' +
+    (e.tgtH ? '<div><span class="cb-l">Horizon</span><b>' + esc(e.tgtH) + '</b></div>' : '') +
+    (e.conf != null ? '<div><span class="cb-l">Conviction</span><b class="num">' + esc(e.conf) + '%</b></div>' : '') +
+    (since != null ? '<div><span class="cb-l">Since call ' + esc(e.since.d) + '</span><b class="num ' + (since >= 0 ? 'upc' : 'dnc') + '">' + fpct(since) + '</b></div>' : '') +
+    '</div>';
+}
+function recordHTML(s) {
+  var led = (s.ledger || []).slice().reverse(), out = '';
+  if ((s.lessons || []).length) {
+    out += '<div class="nlabel">LESSONS THE MODEL CARRIES FORWARD</div><ul class="keypts sm">' +
+      s.lessons.map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('') + '</ul>';
+  }
+  out += '<div class="nlabel">EVERY CALL, SCORED AGAINST THE TAPE</div>';
+  if (!led.length) return out + '<p class="scempty">No calls recorded yet.</p>';
+  out += '<div class="ledger">' + led.map(function (r) {
+    var q = (s.P || {})[r.t] || {};
+    var now = r.closed_px != null ? r.closed_px : q.last;
+    var mv = (r.px && now) ? (now / r.px - 1) * 100 : null;
+    var cls = { buy: 'buy', drop: 'refrain', wait: 'wait', refrain: 'refrain' }[r.call] || 'wait';
+    return '<div class="ledrow' + (r.closed ? ' closed' : '') + '">' +
+      '<span class="led-d num">' + esc(r.d) + '</span><span class="led-t num">' + esc(r.t) + '</span>' +
+      '<span class="vpill ' + cls + '">' + esc(String(r.call || '').toUpperCase()) + '</span>' +
+      '<span class="num led-px">$' + fnum(r.px) + (r.tgt ? ' \u2192 $' + fnum(r.tgt) : '') + '</span>' +
+      (mv != null ? '<span class="num led-mv ' + (mv >= 0 ? 'upc' : 'dnc') + '">' + fpct(mv) + (r.closed ? ' at close' : ' so far') + '</span>' : '<span></span>') +
+      (r.outcome && r.outcome !== 'open' ? '<span class="fchip2' + (r.outcome === 'right' ? ' good' : ' warn') + '">' + esc(r.outcome) + '</span>' : '') +
+      (r.note ? '<span class="led-n">' + esc(r.note) + '</span>' : '') + '</div>';
+  }).join('') + '</div>';
+  return out;
+}
 function stocksSubtabs(s, sub) {
   var scan = s.C.filter(function (c) { return s.port.indexOf(c.t) < 0; });
   function n(v) { return scan.filter(function (c) { return c.v === v; }).length; }
@@ -619,9 +655,10 @@ function stocksSubtabs(s, sub) {
     return '<a href="#/stocks' + (id ? '/' + id : '') + '"' + (sub === id ? ' class="on"' : '') + '>' + label +
       (cnt != null ? ' <span class="num">' + cnt + '</span>' : '') + '</a>';
   }
-  return '<nav class="subtabs">' + tab('', 'Board', scan.length) +
-    tab('buy', 'Buy', n('buy')) + tab('wait', 'Wait', n('wait')) + tab('refrain', 'Refrain', n('refrain')) +
-    tab('portfolio', 'My Portfolio', portSet(s).length) + tab('watch', '★ Watchlist', watchList().length) + tab('dropped', 'Dropped', s.aside.length) + '</nav>';
+  var board = scan.filter(function (c) { return c.v === 'buy' && s.aside.indexOf(c.t) < 0; });
+  return '<nav class="subtabs">' + tab('', 'Buy board', board.length) +
+    tab('portfolio', 'My Portfolio', portSet(s).length) + tab('watch', '★ Watchlist', watchList().length) +
+    tab('dropped', 'Dropped', s.aside.length) + tab('record', 'Record', (s.ledger || []).length) + '</nav>';
 }
 function stripHTML(s) {
   var tiles = (s.strip || []).map(function (t) {
@@ -634,7 +671,7 @@ function stripHTML(s) {
   return tiles ? '<div class="mstrip2">' + tiles + '</div>' : '';
 }
 function stocksHTML(s, sub) {
-  var known = { '': 1, buy: 1, wait: 1, refrain: 1, portfolio: 1, watch: 1, dropped: 1 };
+  var known = { '': 1, portfolio: 1, watch: 1, dropped: 1, record: 1 };
   if (!known[sub]) sub = '';
   var scan = s.C.filter(function (c) { return s.port.indexOf(c.t) < 0; });
   var byT = {};
@@ -651,7 +688,9 @@ function stocksHTML(s, sub) {
       body += '<div class="nlabel">THIS MORNING, BRIEFLY</div><ul class="keypts">' +
         s.gist.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') + '</ul>';
     }
-    body += group('buy', 'BUY') + group('wait', 'WAIT') + group('refrain', 'REFRAIN');
+    var board = scan.filter(function (c) { return c.v === 'buy' && s.aside.indexOf(c.t) < 0; });
+    body += '<div class="ngroup"><span>BUY · ' + board.length + '</span></div>' +
+      (board.length ? rows(board) : '<p class="scempty">No Buy-grade company on the board today.</p>');
   } else if (sub === 'portfolio') {
     var pset = portSet(s);
     body += '<form class="portadd" autocomplete="off"><input id="port-q" name="q" list="tick-list" placeholder="Add a ticker \u2014 e.g. NVDA" maxlength="12">' +
@@ -674,17 +713,17 @@ function stocksHTML(s, sub) {
     var wl = watchList().map(function (t) { return byT[t]; }).filter(Boolean);
     body += wl.length ? rows(wl) : '<p class="scempty">Nothing on your watchlist yet \u2014 tap the \u2606 on any company to follow it here.</p>';
   } else if (sub === 'dropped') {
-    body += '<div class="nlabel">DROPPED FROM THE BOARD</div>' +
+    body += '<div class="nlabel">NOT ON THE BOARD — AND WHY</div>' +
       rows(s.aside.map(function (t) { return byT[t]; }).filter(Boolean));
-  } else {
-    body += rows(scan.filter(function (c) { return c.v === sub; }));
+  } else if (sub === 'record') {
+    body += recordHTML(s);
   }
   return '<article class="paper stocks"><div class="edline">' + esc((s.kicker || '').toUpperCase()) +
     (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' +
     '<div class="tallyrow">' +
-    '<span class="tly buy num">' + (s.tally || {}).buy + ' BUY</span>' +
-    '<span class="tly wait num">' + (s.tally || {}).wait + ' WAIT</span>' +
-    '<span class="tly refrain num">' + (s.tally || {}).refrain + ' REFRAIN</span></div>' +
+    '<span class="tly buy num">' + s.C.filter(function (c) { return c.v === 'buy' && s.port.indexOf(c.t) < 0 && s.aside.indexOf(c.t) < 0; }).length + ' BUY</span>' +
+    '<span class="tly refrain num">' + (s.aside || []).length + ' DROPPED</span>' +
+    '<span class="tly wait num">' + (s.ledger || []).length + ' CALLS ON RECORD</span></div>' +
     (s.dateline ? '<p class="scandate">' + esc(s.dateline) + '</p>' : '') +
     stocksSubtabs(s, sub) + body +
     '<div class="caughtup">Bottom lines are research, not personalized investment advice.</div></article>';
