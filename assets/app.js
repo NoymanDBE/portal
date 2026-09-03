@@ -224,6 +224,28 @@ function costGrid(costs) {
   if (!rows) return '';
   return '<div class="costgrid"><div class="cg-r cg-h"><span></span><span>Ship</span><span>Import</span><span>All-in</span></div>' + rows + '</div>';
 }
+function finGrid(it) {
+  var f = it.fin || {};
+  var cur = it.cur === 'ILS' ? '₪' : (it.cur === 'EUR' ? '€' : '$');
+  var fm = function (x) { return (x == null || isNaN(x)) ? '—' : cur + Math.round(x).toLocaleString('en-US'); };
+  var rows = '';
+  if (it.price != null) rows += '<div class="cg-r"><span class="cg-d">Price</span><b class="num">' + fm(it.price) + '</b></div>';
+  if (f.down != null) rows += '<div class="cg-r"><span class="cg-d">Cash needed</span><b class="num">' + fm(f.down) + '</b><span class="cg-note">incl. purchase costs</span></div>';
+  if (f.ltv != null) rows += '<div class="cg-r"><span class="cg-d">Assumed LTV</span><span class="num">' + esc(f.ltv) + '%</span></div>';
+  if (f.monthly != null) rows += '<div class="cg-r"><span class="cg-d">Est. monthly</span><span class="num">' + fm(f.monthly) + '</span></div>';
+  if (!rows) return '';
+  return '<div class="costgrid fingrid">' + rows + (f.note ? '<div class="cg-r cg-fn">' + esc(f.note) + '</div>' : '') + '</div>';
+}
+function reSpecs(it) {
+  var c = [];
+  if (it.ptype) c.push(esc(it.ptype));
+  if (it.rooms != null) c.push(esc(it.rooms) + ' rooms');
+  if (it.m2 != null) c.push(esc(it.m2) + ' m²');
+  if (it.plot != null) c.push('plot ' + esc(it.plot) + ' m²');
+  if (it.sea_m != null && it.sea_m !== 'n/a') c.push('sea ' + esc(it.sea_m) + ' m');
+  if (it.year) c.push('built ' + esc(it.year));
+  return c.map(function (x) { return '<span class="schip2">' + x + '</span>'; }).join('');
+}
 function flagOf(iso) {
   iso = String(iso || '').toUpperCase();
   if (!/^[A-Z]{2}$/.test(iso)) return '🌐';
@@ -242,7 +264,9 @@ function shopCard(it, saved) {
     (saved ? 'Remove from saved' : 'Save this item') + '">' + (saved ? '★' : '☆') + '</button>';
   var src = it.src || String(it.origin || it.site || '').replace(/\s*\([^)]*\)\s*$/, '').split(',')[0].trim() || it.site || '';
   var ctry = it.country ? flagOf(it.country) + ' ' + esc(it.countryName || it.country) : '🌐 Ship-from country not stated';
-  var ships = (it.ships || []).length ? '<span class="schip2">Ships to: ' + it.ships.map(esc).join(' · ') + '</span>' : '';
+  var isRE = it.kind === 're' || /^re-/.test(it.sid || '');
+  var ships = (!isRE && (it.ships || []).length) ? '<span class="schip2">Ships to: ' + it.ships.map(esc).join(' · ') + '</span>' : '';
+  if (isRE) ctry = (it.country ? flagOf(it.country) + ' ' : '📍 ') + esc(it.loc || it.countryName || it.country || 'Location not stated');
   return '<details class="shrow" data-pu="' + (it.pu != null ? it.pu : '') + '">' +
     '<summary>' + img +
     '<span class="shmain"><span class="sht">' + esc(it.t) + '</span>' +
@@ -253,9 +277,9 @@ function shopCard(it, saved) {
     '<span class="shp num">' + esc(it.p) + '</span>' + star +
     '</summary>' +
     '<div class="shbody">' +
-    '<div class="scmeta">' + (it.cond ? '<span class="schip2">Condition: ' + esc(it.cond) + '</span>' : '') +
-    (it.origin ? '<span class="schip2">' + esc(it.origin) + '</span>' : '') + ships + '</div>' +
-    costGrid(it.costs) +
+    '<div class="scmeta">' + (isRE ? reSpecs(it) : ((it.cond ? '<span class="schip2">Condition: ' + esc(it.cond) + '</span>' : '') +
+    (it.origin ? '<span class="schip2">' + esc(it.origin) + '</span>' : '') + ships)) + '</div>' +
+    (isRE ? finGrid(it) : costGrid(it.costs)) +
     (flags ? '<div class="scmeta">' + flags + '</div>' : '') +
     (it.notes ? '<p class="scnotes">' + esc(it.notes) + '</p>' : '') +
     (it.mkt ? '<p class="scmkt">' + esc(it.mkt) + '</p>' : '') +
