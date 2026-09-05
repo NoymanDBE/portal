@@ -284,7 +284,7 @@ function shopCard(it, saved) {
     (it.notes ? '<p class="scnotes">' + esc(it.notes) + '</p>' : '') +
     (it.mkt ? '<p class="scmkt">' + esc(it.mkt) + '</p>' : '') +
     '<div class="scfoot"><span class="scdate num">found ' + esc(it.found || '') +
-    (it.chk ? ' · checked ' + esc(it.chk) : '') + '</span>' +
+    (it.chk ? ' · checked ' + esc(it.chk) : '') + (it.verify === 'search' ? ' · search-verified' : '') + '</span>' +
     '<a class="sclink" href="' + esc(it.u) + '" target="_blank" rel="noopener noreferrer">View listing ↗</a></div>' +
     '</div></details>';
 }
@@ -374,7 +374,9 @@ function shoppingHTML(s, sub) {
   }
   return '<article class="paper shop"><div class="edline">SHOPPING SCOUT' +
     (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' + subtabs + body +
-    '<div class="caughtup">Every listing was opened and verified live before it entered. Costs are estimates.</div></article>';
+    '<div class="caughtup">' + (s.mode === 'search-only' ?
+      'Chrome was unavailable for this sweep — items marked “search-verified” were priced from search results, not opened on their marketplace.' :
+      'Every listing was opened and verified live before it entered.') + ' Costs are estimates.</div></article>';
 }
 
 /* ---------- Stock Screener ---------- */

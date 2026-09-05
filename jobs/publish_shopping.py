@@ -27,6 +27,7 @@ for it in items:
 
 shopping = {
     "built": meta.get("built", now),
+    "mode": meta.get("mode", "full"),
     "searches": [{"id": q["id"], "name": q["name"], "notes": q.get("notes", ""), "active": q.get("active", True)}
                  for q in searches],
     "items": items,
