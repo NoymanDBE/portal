@@ -95,6 +95,8 @@ manifest = json.load(open(mpath, encoding="utf-8")) if os.path.exists(mpath) els
 manifest["date"] = today
 manifest["generated_at"] = now
 manifest["files"]["stocks"] = f"data/{today}/stocks.enc"
+_bd = re.match(r"(\d\d)/(\d\d)/(\d{4})", str(built or ""))
+manifest.setdefault("content", {})["stocks"] = f"{_bd.group(3)}-{_bd.group(2)}-{_bd.group(1)}" if _bd else today
 with open(mpath, "w", encoding="utf-8") as f:
     json.dump(manifest, f)
 in_aside_not_c = [t for t in ASIDE if t not in [c.get("t") for c in C]]

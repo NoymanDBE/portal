@@ -106,6 +106,9 @@ manifest["date"] = today
 manifest["generated_at"] = now
 manifest["files"]["news"] = f"data/{today}/news.enc"
 manifest["files"].pop("home", None)
+# content date (the paper's own date, ISO) — lets the watchdog tell "published today" from "today's issue"
+_pd = re.match(r"(\d\d)/(\d\d)/(\d{4})", paper.get("date") or "")
+manifest.setdefault("content", {})["news"] = f"{_pd.group(3)}-{_pd.group(2)}-{_pd.group(1)}" if _pd else today
 with open(mpath, "w", encoding="utf-8") as f:
     json.dump(manifest, f)
 print(f"published news edition: {n_stories} stories, images kept {img_kept} / dropped {img_dropped}, manifest updated")

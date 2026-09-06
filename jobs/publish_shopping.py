@@ -48,6 +48,9 @@ manifest["date"] = today
 manifest["generated_at"] = now
 manifest["files"]["shopping"] = f"data/{today}/shopping.enc"
 manifest["files"].pop("home", None)
+import re as _re
+_bd = _re.match(r"(\d\d)/(\d\d)/(\d{4})", str(shopping["built"] or ""))
+manifest.setdefault("content", {})["shopping"] = f"{_bd.group(3)}-{_bd.group(2)}-{_bd.group(1)}" if _bd else today
 with open(mpath, "w", encoding="utf-8") as f:
     json.dump(manifest, f)
 print(f"published shopping: {len(searches)} searches, {len(live)} live / {len(items)} total items, built {shopping['built']}")
