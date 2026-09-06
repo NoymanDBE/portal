@@ -58,9 +58,17 @@ def validate_images(sections):
     return kept, dropped
 
 
+risk = None
 if sys.argv[1].lower().endswith(".json"):
     _st = json.load(open(sys.argv[1], encoding="utf-8"))
     paper, arch = _st["PAPER"], _st.get("ARCH", [])
+    if isinstance(_st.get("RISK"), dict) and _st["RISK"].get("series"):
+        _r = _st["RISK"]
+        risk = {"def": _r.get("def", ""), "series": _r["series"][-90:], "ledger": _r.get("ledger", [])[-200:]}
+        _cur = risk["series"][-1]
+        assert 0 <= _cur["w"] <= _cur["m"] <= 100, "RISK: need 0 <= w <= m <= 100"
+        assert len(_cur.get("fronts", [])) == 6, "RISK: six fronts required"
+        assert len(_cur.get("why", "").split()) >= 60, "RISK: why paragraph too short"
 else:
     src_html = open(sys.argv[1], encoding="utf-8").read()
     paper = json.loads(re.search(r"var PAPER = (\{.*?\});\n", src_html).group(1))
@@ -80,6 +88,7 @@ news = {
     "mktNote": paper.get("mktNote", ""),
     "sections": paper.get("sections", []),
     "archive": arch,
+    "risk": risk,
 }
 n_stories = sum(len(g.get("stories", [])) for s in news["sections"] for g in s.get("groups", []))
 

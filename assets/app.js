@@ -792,13 +792,101 @@ function newsSubtabs(n, sub) {
     return '<a href="' + href + '"' + (sub === id ? ' class="on"' : '') + '>' + esc(label) +
       (cnt != null ? ' <span class="num">' + cnt + '</span>' : '') + '</a>';
   }
-  return '<nav class="subtabs">' + tab('', 'Overview') +
+  var risk = hasRisk(n) ? tab('risk', 'War risk', riskCur(n.risk).m + '%') : '';
+  return '<nav class="subtabs">' + tab('', 'Overview') + risk +
     secs.map(function (s) { return tab(s.id, s.label, secCount(s)); }).join('') + '</nav>';
 }
 function newsOverviewHTML(n) {
   var out = '<div class="nlabel">THE KEY POINTS</div>';
   out += '<ul class="keypts">' + (n.keys || []).map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul>';
+  if (hasRisk(n)) out += riskLine(n.risk);
   out += '<div class="ovhint">Everything else lives in the section tabs above.</div>';
+  return out;
+}
+/* ---------- War-risk gauge ---------- */
+function hasRisk(n) { return !!(n && n.risk && n.risk.series && n.risk.series.length); }
+function riskCur(r) { return r.series[r.series.length - 1]; }
+function riskPrev(r) { return r.series.length > 1 ? r.series[r.series.length - 2] : null; }
+function riskDelta(cur, prev, key, long) {
+  if (!prev || prev[key] == null) return long ? 'first reading' : '';
+  var d = Math.round(cur[key] - prev[key]);
+  var s = d > 0 ? '+' + d : (d < 0 ? '−' + Math.abs(d) : '±0');
+  return long ? s + ' pts vs ' + esc(String(prev.d || '').slice(0, 5)) : s;
+}
+function riskLine(r) {
+  var cur = riskCur(r), prev = riskPrev(r);
+  var dm = riskDelta(cur, prev, 'm', false);
+  return '<a class="riskline" href="#/news/risk"><span class="rll">WAR-RISK GAUGE</span>' +
+    '<span>next 7 days <b class="num">' + esc(cur.w) + '%</b></span><span>next 30 days <b class="num">' + esc(cur.m) + '%</b>' +
+    (dm ? ' <span class="rdl num">' + dm + '</span>' : '') + '</span><span class="rarr">full analysis →</span></a>';
+}
+function riskSVG(series) {
+  var W = 640, H = 230, L = 40, R = 16, T = 18, B = 30;
+  var pts = series.slice(-60), n = pts.length, vmax = 0;
+  pts.forEach(function (e) { vmax = Math.max(vmax, +e.w || 0, +e.m || 0); });
+  var ymax = Math.min(100, Math.max(20, Math.ceil(vmax * 1.25 / 10) * 10));
+  var x = function (i) { return n > 1 ? L + (W - L - R) * i / (n - 1) : (L + W - R) / 2; };
+  var y = function (v) { return T + (H - T - B) * (1 - v / ymax); };
+  var out = '<svg class="rchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="War-risk gauge over time">';
+  for (var k = 0; k <= 4; k++) {
+    var v = ymax * k / 4;
+    out += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/>' +
+      '<text x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + Math.round(v) + '%</text>';
+  }
+  var step = Math.max(1, Math.ceil(n / 6));
+  pts.forEach(function (e, i) {
+    if (i % step === 0 || i === n - 1) out += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(String(e.d || '').slice(0, 5)) + '</text>';
+  });
+  ['m', 'w'].forEach(function (key) {
+    var cls = key === 'w' ? 'lw' : 'lm';
+    if (n > 1) out += '<polyline class="' + cls + '" points="' + pts.map(function (e, i) { return x(i) + ',' + y(+e[key] || 0); }).join(' ') + '"/>';
+    pts.forEach(function (e, i) {
+      out += '<circle class="d' + key + '" cx="' + x(i) + '" cy="' + y(+e[key] || 0) + '" r="3.2"><title>' + esc(String(e.d || '').slice(0, 5)) +
+        ' · 7-day ' + esc(e.w) + '% · 30-day ' + esc(e.m) + '%</title></circle>';
+    });
+    var last = pts[n - 1];
+    out += '<text class="lv" x="' + Math.min(x(n - 1) + 8, W - R - 24) + '" y="' + (y(+last[key] || 0) + 4) + '">' + esc(last[key]) + '%</text>';
+  });
+  return out + '</svg>';
+}
+function riskHTML(r) {
+  var cur = riskCur(r), prev = riskPrev(r), s = r.series;
+  var trend = { up: '↑', down: '↓', flat: '→' };
+  var out = '<div class="rtiles">' +
+    '<div class="rtile"><span class="rl">NEXT 7 DAYS</span><b class="num">' + esc(cur.w) + '%</b><span class="rd num">' + riskDelta(cur, prev, 'w', true) + '</span></div>' +
+    '<div class="rtile"><span class="rl">NEXT 30 DAYS</span><b class="num">' + esc(cur.m) + '%</b><span class="rd num">' + riskDelta(cur, prev, 'm', true) +
+    ((cur.range_m || []).length === 2 ? ' · plausible ' + esc(cur.range_m[0]) + '–' + esc(cur.range_m[1]) + '%' : '') + '</span></div>' +
+    '<div class="rtile"><span class="rl">CONFIDENCE</span><b>' + esc(cur.conf || '—') + '</b><span class="rd">estimated ' + esc(cur.t || cur.d) + '</span></div></div>';
+  out += riskSVG(s) + '<div class="rleg"><span><i class="w"></i>Next 7 days</span><span><i class="m"></i>Next 30 days</span>' +
+    (s.length < 2 ? '<span>First reading — the lines build up day by day.</span>' : '<span class="num">' + s.length + ' daily readings</span>') + '</div>';
+  out += '<div class="nlabel">THE READ</div><p class="rwhy">' + esc(cur.why) + '</p>';
+  if ((cur.fronts || []).length) {
+    out += '<div class="nlabel">BY FRONT</div><div class="rfr"><span class="rfh">Front</span><span class="rfh">7 days</span><span class="rfh">30 days</span><span class="rfh"></span>' +
+      cur.fronts.map(function (f) {
+        return '<span class="rfn">' + esc(f.name || f.id) + '</span><span class="num">' + esc(f.w) + '%</span><span class="num">' + esc(f.m) + '%</span>' +
+          '<span class="rft ' + esc(f.trend || 'flat') + '">' + (trend[f.trend] || '→') + '</span>' +
+          (f.why ? '<span class="rfw">' + esc(f.why) + '</span>' : '');
+      }).join('') + '</div>';
+  }
+  function list(label, arr) { return (arr || []).length ? '<div class="nlabel">' + label + '</div><ul class="rlist">' + arr.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : ''; }
+  out += list('WHAT WOULD PUSH IT UP', cur.up) + list('WHAT WOULD PULL IT DOWN', cur.down) + list('THE EVIDENCE', cur.evidence);
+  if ((cur.anchors || []).length) {
+    out += '<div class="nlabel">OUTSIDE ANCHORS</div><ul class="rlist">' + cur.anchors.map(function (a) {
+      return '<li>' + esc(a.src) + ': ' + esc(a.q) + ' — <b class="num">' + esc(a.p) + '%</b>' + (a.asof ? ' <span class="num">(' + esc(a.asof) + ')</span>' : '') + '</li>';
+    }).join('') + '</ul>';
+  }
+  var led = (r.ledger || []).filter(function (e) { return e.outcome === 'yes' || e.outcome === 'no'; });
+  out += '<div class="nlabel">TRACK RECORD</div>';
+  if (led.length) {
+    var bs = led.reduce(function (a, e) { var o = e.outcome === 'yes' ? 1 : 0; return a + Math.pow((+e.p || 0) / 100 - o, 2); }, 0) / led.length;
+    var hits = led.filter(function (e) { return e.outcome === 'yes'; }).length;
+    out += '<p class="rdef"><span class="num">' + led.length + '</span> windows resolved · <span class="num">' + hits + '</span> saw a qualifying event · Brier score <b class="num">' + bs.toFixed(3) + '</b> (0 = perfect, 0.25 = coin-flip).</p>' +
+      '<ul class="rlist sm">' + led.slice(-10).reverse().map(function (e) {
+        return '<li><span class="num">' + esc(e.d0) + '</span> ' + esc(e.win) + ' window at <span class="num">' + esc(e.p) + '%</span> → <b>' + (e.outcome === 'yes' ? 'event' : 'no event') + '</b>' + (e.note ? ' — ' + esc(e.note) : '') + '</li>';
+      }).join('') + '</ul>';
+  } else out += '<p class="rdef">No forecast window has closed yet. Each day\'s 7-day and 30-day calls are scored once their window ends.</p>';
+  if (r.def) out += '<details class="rdefbox"><summary class="nlabel">WHAT COUNTS AS A SERIOUS ESCALATION</summary><p class="rdef">' + esc(r.def) + '</p></details>';
+  out += '<div class="rfoot">' + (cur.method ? esc(cur.method) + ' ' : '') + 'Re-researched every morning by Fable 5 from primary sources, base rates and live forecast markets; yesterday\'s number is never carried forward by inertia.</div>';
   return out;
 }
 function newsSectionHTML(s) {
@@ -816,10 +904,12 @@ function newsSectionHTML(s) {
 function newsHTML(n, sub) {
   var secs = n.sections || [];
   var known = { '': 1 };
+  if (hasRisk(n)) known.risk = 1;
   secs.forEach(function (s) { known[s.id] = 1; });
   if (!known[sub]) sub = '';
   var body;
   if (sub === '') body = newsOverviewHTML(n);
+  else if (sub === 'risk') body = riskHTML(n.risk);
   else body = newsSectionHTML(secs.filter(function (s) { return s.id === sub; })[0]);
   return '<article class="paper"><div class="edline">' + esc(n.edition_line || '') + '</div>' +
     newsSubtabs(n, sub) + body + '</article>';
