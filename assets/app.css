@@ -388,3 +388,23 @@ details.shrow .savestar:hover,details.shrow .savestar.on{color:var(--warn)}
 .rdefbox summary::after{content:" ▸";opacity:.6}
 .rdefbox[open] summary::after{content:" ▾"}
 .rfoot{font-size:12.5px;color:var(--text-2);margin-top:18px;line-height:1.5}
+.rwrap{margin-top:14px}
+.rctl{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+.rctl button{background:var(--bg-2);border:1px solid var(--hair);color:var(--text-1);font:600 12px var(--sans);border-radius:999px;padding:6px 11px;cursor:pointer}
+.rctl button.on{background:var(--news);border-color:var(--news);color:var(--accent-ink)}
+.rctl button:disabled{opacity:.4;cursor:default}
+.rctl .rsep{width:1px;height:18px;background:var(--hair);margin:0 4px}
+.rread{font-size:14px;color:var(--text-2);min-height:22px;margin-bottom:4px;line-height:1.5}
+.rread b{color:var(--text-1);font-weight:800}
+.rread .rnote{color:var(--warn);font-weight:600}
+.rchart .hb{fill:color-mix(in srgb,var(--warn) 42%,transparent)}
+.rchart .hb.hn{fill:color-mix(in srgb,var(--warn) 78%,transparent)}
+.rchart .hnl{fill:var(--warn);font-size:14px}
+.rchart .lc{fill:none;stroke:var(--news);stroke-width:2.2;stroke-linejoin:round}
+.rchart .dc{fill:var(--news)}
+.rchart .rcx{stroke:var(--text-2);stroke-width:1;stroke-dasharray:3 3}
+.rleg i.h{background:color-mix(in srgb,var(--warn) 60%,transparent)}.rleg i.c{background:var(--news)}
+.rleg .rhint{margin-left:auto;opacity:.7}
+.callbox .cbw{grid-column:1/-1}
+.callbox .cbw b{font-size:13.5px;font-weight:600;line-height:1.4}
+.shstatus{margin-top:12px}

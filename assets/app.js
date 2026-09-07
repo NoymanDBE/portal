@@ -179,14 +179,18 @@ function route() {
     });
     return;
   }
-  if (cur.r === 'shopping' && state.manifest && state.manifest.files && state.manifest.files.shopping) {
+  if (cur.r === 'shopping') {
+    // Saved items live in this browser — they render at once, whether or not today's list is available.
     if (state.content.shopping) { v.innerHTML = shoppingHTML(state.content.shopping, cur.sub); return; }
-    v.innerHTML = '<div class="placeholder"><div class="b">Decrypting today’s finds…</div></div>';
+    var hasFile = state.manifest && state.manifest.files && state.manifest.files.shopping;
+    v.innerHTML = shoppingHTML(shopShell(hasFile ? 'loading' : 'failed'), cur.sub);
+    if (!hasFile) return;
     loadBlob('shopping').then(function () {
       var now = parseRoute();
       if (now.r === 'shopping') v.innerHTML = shoppingHTML(state.content.shopping, now.sub);
     }).catch(function () {
-      v.innerHTML = '<div class="placeholder"><div class="a">No finds yet.</div><div class="b">The hunt runs each morning.</div></div>';
+      var now = parseRoute();
+      if (now.r === 'shopping') v.innerHTML = shoppingHTML(shopShell('failed'), now.sub);
     });
     return;
   }
@@ -198,6 +202,7 @@ function route() {
 function savedStore() {
   try { return JSON.parse(localStorage.getItem('shop_saved_v1') || '{}'); } catch (e) { return {}; }
 }
+function shopShell(status) { return { searches: [], items: [], built: null, status: status }; }
 function setSavedStore(s) {
   try { localStorage.setItem('shop_saved_v1', JSON.stringify(s)); } catch (e) {}
 }
@@ -358,7 +363,7 @@ function shoppingHTML(s, sub) {
     live.forEach(function (it) { liveIds[it.id] = 1; });
     var list = savedIds.map(function (id) {
       var it = saved[id];
-      if (!liveIds[id]) {
+      if (!liveIds[id] && !s.status) {
         it = JSON.parse(JSON.stringify(it));
         it.flags = (it.flags || []).concat(['No longer on the daily list']);
         it.is_new = false;
@@ -372,8 +377,10 @@ function shoppingHTML(s, sub) {
     if (q.notes) body += '<p class="scandate">' + esc(q.notes) + '</p>';
     body += grid(bySid[sub] || [], sub);
   }
+  var status = s.status === 'loading' ? '<p class="scandate shstatus">Today’s finds are being decrypted — your saved items are already here.</p>' :
+    (s.status ? '<p class="scandate shstatus">Today’s list isn’t available right now — your saved items are always here.</p>' : '');
   return '<article class="paper shop"><div class="edline">SHOPPING SCOUT' +
-    (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' + subtabs + body +
+    (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' + subtabs + status + body +
     '<div class="caughtup">' + (s.mode === 'search-only' ?
       'Chrome was unavailable for this sweep — items marked “search-verified” were priced from search results, not opened on their marketplace.' :
       'Every listing was opened and verified live before it entered.') + ' Costs are estimates.</div></article>';
@@ -649,7 +656,18 @@ function callBox(e, q) {
     (e.tgtH ? '<div><span class="cb-l">Horizon</span><b>' + esc(e.tgtH) + '</b></div>' : '') +
     (e.conf != null ? '<div><span class="cb-l">Conviction</span><b class="num">' + esc(e.conf) + '%</b></div>' : '') +
     (since != null ? '<div><span class="cb-l">Since call ' + esc(e.since.d) + '</span><b class="num ' + (since >= 0 ? 'upc' : 'dnc') + '">' + fpct(since) + '</b></div>' : '') +
+    boardAge(e) +
     '</div>';
+}
+function boardAge(e) {
+  var out = '';
+  if (e.since && e.since.d) {
+    var t0 = new Date(e.since.d), days = isNaN(t0) ? null : Math.max(0, Math.floor((Date.now() - t0.getTime()) / 86400000));
+    out += '<div><span class="cb-l">On board</span><b class="num">' + (days != null ? days + ' days' : esc(e.since.d)) + '</b></div>';
+  }
+  if (e.rechk && e.rechk.d) out += '<div class="cbw"><span class="cb-l">Re-checked ' + esc(e.rechk.d) + '</span><b>' + esc(e.rechk.note || '') + '</b></div>';
+  else if (e.researched) out += '<div><span class="cb-l">Last full research</span><b class="num">' + esc(e.researched) + '</b></div>';
+  return out;
 }
 function recordHTML(s) {
   var led = (s.ledger || []).slice().reverse(), out = '';
@@ -820,6 +838,118 @@ function riskLine(r) {
     '<span>next 7 days <b class="num">' + esc(cur.w) + '%</b></span><span>next 30 days <b class="num">' + esc(cur.m) + '%</b>' +
     (dm ? ' <span class="rdl num">' + dm + '</span>' : '') + '</span><span class="rarr">full analysis →</span></a>';
 }
+/* interactive risk chart: "curve" = the next 30 days of today's reading (per-day chance + cumulative), "history" = how the 7/30-day readings moved */
+var RK = { view: 'curve', range: 30 };
+var RKG = { W: 640, H: 240, L: 42, R: 48, T: 16, B: 28 };
+var RKD = null;
+function riskDow(dm, baseD) {
+  var p = String(dm).split('/'), b = String(baseD || '').split('/');
+  if (p.length < 2 || b.length < 3) return '';
+  var y = +b[2], m = +p[1], d = +p[0];
+  if (m < +b[1]) y += 1;
+  var dt = new Date(y, m - 1, d);
+  return isNaN(dt) ? '' : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getDay()];
+}
+function riskData(r) {
+  var cur = riskCur(r), daily = cur.daily || [];
+  if (RK.view === 'curve' && !daily.length) RK.view = 'history';
+  if (RK.view === 'curve') {
+    var pts = daily.slice(0, RK.range === 7 ? 7 : 30), cmax = 0, hmax = 0;
+    pts.forEach(function (p) { cmax = Math.max(cmax, +p.c || 0); hmax = Math.max(hmax, +p.h || 0); });
+    return { view: 'curve', pts: pts, cur: cur, cmax: Math.min(100, Math.max(5, Math.ceil(cmax * 1.25 / 5) * 5)), hmax: Math.max(0.5, hmax * 1.7) };
+  }
+  var s = r.series.slice(-60), vmax = 0;
+  s.forEach(function (e) { vmax = Math.max(vmax, +e.w || 0, +e.m || 0); });
+  return { view: 'history', pts: s, cur: cur, cmax: Math.min(100, Math.max(20, Math.ceil(vmax * 1.25 / 10) * 10)) };
+}
+function riskReadout(g, i) {
+  var p = g.pts[i];
+  if (!p) return '';
+  if (g.view === 'curve') {
+    var dow = riskDow(p.d, g.cur.d);
+    return '<b class="num">' + (dow ? dow + ' ' : '') + esc(p.d) + '</b> · that day <b class="num">' + esc(p.h) + '%</b> · by then <b class="num">' + esc(p.c) + '%</b>' +
+      (p.n ? ' · <span class="rnote">' + esc(p.n) + '</span>' : '');
+  }
+  return '<b class="num">' + esc(String(p.d || '').slice(0, 5)) + '</b> · next 7 days <b class="num">' + esc(p.w) + '%</b> · next 30 days <b class="num">' + esc(p.m) + '%</b>' +
+    (p.conf ? ' · ' + esc(p.conf) + ' confidence' : '');
+}
+function riskChartHTML(r) {
+  var g = riskData(r); RKD = g;
+  var W = RKG.W, H = RKG.H, L = RKG.L, R = RKG.R, T = RKG.T, B = RKG.B, n = g.pts.length;
+  var yc = function (v) { return T + (H - T - B) * (1 - v / g.cmax); };
+  var out = '<svg class="rchart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="War-risk chart">';
+  for (var k = 0; k <= 4; k++) {
+    var v = g.cmax * k / 4;
+    out += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + yc(v) + '" y2="' + yc(v) + '"/>' +
+      '<text x="' + (L - 6) + '" y="' + (yc(v) + 4) + '" text-anchor="end">' + (Math.round(v * 10) / 10) + '%</text>';
+  }
+  var step = Math.max(1, Math.ceil(n / 6));
+  if (g.view === 'curve') {
+    var bw = (W - L - R) / Math.max(1, n);
+    var yh = function (v) { return T + (H - T - B) * (1 - v / g.hmax); };
+    g.pts.forEach(function (p, i) {
+      var x0 = L + i * bw, h = +p.h || 0;
+      out += '<rect class="hb' + (p.n ? ' hn' : '') + '" x="' + (x0 + bw * 0.15).toFixed(1) + '" y="' + yh(h).toFixed(1) + '" width="' + (bw * 0.7).toFixed(1) + '" height="' + Math.max(0, H - B - yh(h)).toFixed(1) + '"><title>' +
+        esc(p.d) + ' · ' + esc(p.h) + '% that day · ' + esc(p.c) + '% by then' + (p.n ? ' · ' + esc(p.n) : '') + '</title></rect>';
+      if (p.n) out += '<text class="hnl" x="' + (x0 + bw / 2).toFixed(1) + '" y="' + (yh(h) - 4).toFixed(1) + '" text-anchor="middle">•</text>';
+      if (i % step === 0 || i === n - 1) out += '<text x="' + (x0 + bw / 2).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(p.d) + '</text>';
+    });
+    out += '<polyline class="lc" points="' + g.pts.map(function (p, i) { return (L + (i + 0.5) * bw).toFixed(1) + ',' + yc(+p.c || 0).toFixed(1); }).join(' ') + '"/>';
+    g.pts.forEach(function (p, i) { out += '<circle class="dc" cx="' + (L + (i + 0.5) * bw).toFixed(1) + '" cy="' + yc(+p.c || 0).toFixed(1) + '" r="2.6"/>'; });
+    [0.5, 1].forEach(function (f) { var hv = g.hmax * f; out += '<text x="' + (W - R + 6) + '" y="' + (yh(hv) + 4) + '">' + (Math.round(hv * 10) / 10) + '%/d</text>'; });
+    var lastP = g.pts[n - 1];
+    if (lastP) out += '<text class="lv" x="' + (L + (n - 0.5) * bw).toFixed(1) + '" y="' + (yc(+lastP.c || 0) - 7).toFixed(1) + '" text-anchor="end">' + esc(lastP.c) + '%</text>';
+  } else {
+    var x = function (i) { return n > 1 ? L + (W - L - R) * i / (n - 1) : (L + W - R) / 2; };
+    g.pts.forEach(function (e, i) { if (i % step === 0 || i === n - 1) out += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(String(e.d || '').slice(0, 5)) + '</text>'; });
+    ['m', 'w'].forEach(function (key) {
+      var cls = key === 'w' ? 'lw' : 'lm';
+      if (n > 1) out += '<polyline class="' + cls + '" points="' + g.pts.map(function (e, i) { return x(i) + ',' + yc(+e[key] || 0); }).join(' ') + '"/>';
+      g.pts.forEach(function (e, i) { out += '<circle class="d' + key + '" cx="' + x(i) + '" cy="' + yc(+e[key] || 0) + '" r="3.2"/>'; });
+      var lastE = g.pts[n - 1];
+      if (lastE) out += '<text class="lv" x="' + Math.min(x(n - 1) + 8, W - R + 34) + '" y="' + (yc(+lastE[key] || 0) + 4) + '">' + esc(lastE[key]) + '%</text>';
+    });
+  }
+  out += '<g class="rcross" style="display:none"><line class="rcx" x1="0" x2="0" y1="' + T + '" y2="' + (H - B) + '"/></g></svg>';
+  var hasDaily = (g.cur.daily || []).length > 0;
+  var ctl = '<div class="rctl">' +
+    '<button type="button" data-rv="curve" class="' + (g.view === 'curve' ? 'on' : '') + '"' + (hasDaily ? '' : ' disabled') + '>Next 30 days</button>' +
+    '<button type="button" data-rv="history" class="' + (g.view === 'history' ? 'on' : '') + '">History</button>' +
+    (g.view === 'curve' ? '<span class="rsep"></span><button type="button" data-rr="7" class="' + (RK.range === 7 ? 'on' : '') + '">7 days</button>' +
+      '<button type="button" data-rr="30" class="' + (RK.range === 30 ? 'on' : '') + '">30 days</button>' : '') + '</div>';
+  var leg = g.view === 'curve' ?
+    '<div class="rleg"><span><i class="h"></i>Chance on that day</span><span><i class="c"></i>Cumulative by then</span><span>• notable day</span><span class="rhint">Hover or touch the chart</span></div>' :
+    '<div class="rleg"><span><i class="w"></i>Next 7 days</span><span><i class="m"></i>Next 30 days</span>' +
+      (n < 2 ? '<span>First reading — the lines build up day by day.</span>' : '<span class="num">' + n + ' daily readings</span>') + '</div>';
+  return '<div class="rwrap">' + ctl + '<div class="rread">' + riskReadout(g, n - 1) + '</div>' + out + leg + '</div>';
+}
+function rRedraw() {
+  var r = (state.content.news || {}).risk, w = document.querySelector('.rwrap');
+  if (r && w) w.outerHTML = riskChartHTML(r);
+}
+function rIndexAt(g, x) {
+  var n = g.pts.length, inner = RKG.W - RKG.L - RKG.R;
+  if (g.view === 'curve') { var bw = inner / n; var i = Math.max(0, Math.min(n - 1, Math.floor((x - RKG.L) / bw))); return { i: i, cx: RKG.L + (i + 0.5) * bw }; }
+  var j = n > 1 ? Math.max(0, Math.min(n - 1, Math.round((x - RKG.L) / inner * (n - 1)))) : 0;
+  return { i: j, cx: n > 1 ? RKG.L + inner * j / (n - 1) : (RKG.L + RKG.W - RKG.R) / 2 };
+}
+function rHover(svg, clientX) {
+  var g = RKD;
+  if (!g || !g.pts.length) return;
+  var rect = svg.getBoundingClientRect();
+  if (!rect.width) return;
+  var at = rIndexAt(g, (clientX - rect.left) / rect.width * RKG.W);
+  var cross = svg.querySelector('.rcross');
+  if (cross) { cross.style.display = ''; var l = cross.querySelector('.rcx'); l.setAttribute('x1', at.cx.toFixed(1)); l.setAttribute('x2', at.cx.toFixed(1)); }
+  var rd = svg.parentNode.querySelector('.rread');
+  if (rd) rd.innerHTML = riskReadout(g, at.i);
+}
+function rLeave(svg) {
+  var g = RKD, cross = svg.querySelector('.rcross');
+  if (cross) cross.style.display = 'none';
+  var rd = svg.parentNode.querySelector('.rread');
+  if (g && rd) rd.innerHTML = riskReadout(g, g.pts.length - 1);
+}
 function riskSVG(series) {
   var W = 640, H = 230, L = 40, R = 16, T = 18, B = 30;
   var pts = series.slice(-60), n = pts.length, vmax = 0;
@@ -857,8 +987,7 @@ function riskHTML(r) {
     '<div class="rtile"><span class="rl">NEXT 30 DAYS</span><b class="num">' + esc(cur.m) + '%</b><span class="rd num">' + riskDelta(cur, prev, 'm', true) +
     ((cur.range_m || []).length === 2 ? ' · plausible ' + esc(cur.range_m[0]) + '–' + esc(cur.range_m[1]) + '%' : '') + '</span></div>' +
     '<div class="rtile"><span class="rl">CONFIDENCE</span><b>' + esc(cur.conf || '—') + '</b><span class="rd">estimated ' + esc(cur.t || cur.d) + '</span></div></div>';
-  out += riskSVG(s) + '<div class="rleg"><span><i class="w"></i>Next 7 days</span><span><i class="m"></i>Next 30 days</span>' +
-    (s.length < 2 ? '<span>First reading — the lines build up day by day.</span>' : '<span class="num">' + s.length + ' daily readings</span>') + '</div>';
+  out += riskChartHTML(r);
   out += '<div class="nlabel">THE READ</div><p class="rwhy">' + esc(cur.why) + '</p>';
   if ((cur.fronts || []).length) {
     out += '<div class="nlabel">BY FRONT</div><div class="rfr"><span class="rfh">Front</span><span class="rfh">7 days</span><span class="rfh">30 days</span><span class="rfh"></span>' +
@@ -934,6 +1063,10 @@ $('view').addEventListener('click', function (ev) {
   if (b) { ev.preventDefault(); toggleSaved(b.getAttribute('data-id')); route(); return; }
   var kr = el.closest('[data-kr]');
   if (kr) { ev.preventDefault(); var w = kr.closest('.kwrap'); K.range[w.getAttribute('data-t')] = kr.getAttribute('data-kr'); kRedraw(w.getAttribute('data-t')); return; }
+  var rv = el.closest('[data-rv]');
+  if (rv) { ev.preventDefault(); RK.view = rv.getAttribute('data-rv'); rRedraw(); return; }
+  var rr = el.closest('[data-rr]');
+  if (rr) { ev.preventDefault(); RK.range = +rr.getAttribute('data-rr'); rRedraw(); return; }
   var ws = el.closest('[data-w]');
   if (ws) { ev.preventDefault(); toggleWatch(ws.getAttribute('data-w')); route(); return; }
   var pa = el.closest('[data-portadd-t]');
@@ -959,21 +1092,30 @@ $('view').addEventListener('submit', function (ev) {
   var t = (inp.value || '').trim().toUpperCase();
   if (t) { portAdd(t); inp.value = ''; route(); }
 });
+function chartAt(ev) {
+  var t = ev.target && ev.target.closest ? ev.target : null;
+  if (!t) return null;
+  var k = t.closest('svg.kchart[data-t]');
+  if (k) return { k: k };
+  var r = t.closest('svg.rchart');
+  return r ? { r: r } : null;
+}
 $('view').addEventListener('mousemove', function (ev) {
-  var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;
-  if (svg) kHover(svg, ev.clientX);
+  var c = chartAt(ev);
+  if (c && c.k) kHover(c.k, ev.clientX);
+  if (c && c.r) rHover(c.r, ev.clientX);
 });
 $('view').addEventListener('mouseout', function (ev) {
-  var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;
-  if (svg && !(ev.relatedTarget && svg.contains(ev.relatedTarget))) kLeave(svg);
+  var c = chartAt(ev), svg = c && (c.k || c.r);
+  if (svg && !(ev.relatedTarget && svg.contains(ev.relatedTarget))) { if (c.k) kLeave(svg); else rLeave(svg); }
 });
 $('view').addEventListener('touchstart', function (ev) {
-  var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;
-  if (svg && ev.touches[0]) kHover(svg, ev.touches[0].clientX);
+  var c = chartAt(ev);
+  if (c && ev.touches[0]) { if (c.k) kHover(c.k, ev.touches[0].clientX); else rHover(c.r, ev.touches[0].clientX); }
 }, { passive: true });
 $('view').addEventListener('touchmove', function (ev) {
-  var svg = ev.target && ev.target.closest ? ev.target.closest('svg.kchart[data-t]') : null;
-  if (svg && ev.touches[0]) kHover(svg, ev.touches[0].clientX);
+  var c = chartAt(ev);
+  if (c && ev.touches[0]) { if (c.k) kHover(c.k, ev.touches[0].clientX); else rHover(c.r, ev.touches[0].clientX); }
 }, { passive: true });
 $('unlock-btn').addEventListener('click', function () {
   var t = $('key-input').value.trim();
