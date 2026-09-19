@@ -326,7 +326,8 @@ function shoppingHTML(s, sub) {
   live.forEach(function (it) { (bySid[it.sid] = bySid[it.sid] || []).push(it); });
   var saved = savedStore();
   var savedIds = Object.keys(saved);
-  var first = (s.searches || []).length ? s.searches[0].id : 'saved';
+  var withFinds = (s.searches || []).filter(function (q) { return (bySid[q.id] || []).length; });
+  var first = withFinds.length ? withFinds[0].id : ((s.searches || []).length ? s.searches[0].id : 'saved');  // open on a hunt that has something to show
   var known = { saved: 1 };
   (s.searches || []).forEach(function (q) { known[q.id] = 1; });
   if (!known[sub]) sub = first;
@@ -717,6 +718,13 @@ function stripHTML(s) {
   }).join('');
   return tiles ? '<div class="mstrip2">' + tiles + '</div>' : '';
 }
+function nearMisses(s, byT) {
+  return (s.aside || []).map(function (t) { return byT[t]; })
+    .filter(function (e) { return e && s.port.indexOf(e.t) < 0 && e.conf != null && /^watch/i.test(e.drop_reason || ''); })
+    .sort(function (a, b) { return (b.conf || 0) - (a.conf || 0); })
+    .filter(function (e) { if (e.sector !== 'biopharma') return true; this.n = (this.n || 0) + 1; return this.n <= 2; }, {})  // technology first: at most two drug developers
+    .slice(0, 6);
+}
 function stocksHTML(s, sub) {
   var known = { '': 1, portfolio: 1, watch: 1, dropped: 1, record: 1 };
   if (!known[sub]) sub = '';
@@ -737,7 +745,13 @@ function stocksHTML(s, sub) {
     }
     var board = scan.filter(function (c) { return c.v === 'buy' && s.aside.indexOf(c.t) < 0; });
     body += '<div class="ngroup"><span>BUY · ' + board.length + '</span></div>' +
-      (board.length ? rows(board) : '<p class="scempty">No Buy-grade company on the board today.</p>');
+      (board.length ? '<div class="boardlist">' + rows(board) + '</div>' :
+        '<p class="scempty">No company clears the bar today: conviction of at least 60%, at least +15% to the target, and reward-to-risk of 2 to 1 or better. Waiting is a position — the names below say at what price or event each becomes a Buy.</p>');
+    var near = nearMisses(s, byT);
+    if (near.length) body += '<div class="ngroup"><span>CLOSEST TO A BUY — AND WHAT WOULD GET THEM THERE · ' + near.length + '</span></div>' +
+      '<div class="nearlist">' + near.map(function (e) {
+        return '<p class="nearwhy"><b class="num">' + esc(e.t) + '</b> ' + esc(e.drop_reason) + '</p>' + stockRow(e, s.P);
+      }).join('') + '</div>';
   } else if (sub === 'portfolio') {
     var pset = portSet(s);
     body += '<form class="portadd" autocomplete="off"><input id="port-q" name="q" list="tick-list" placeholder="Add a ticker \u2014 e.g. NVDA" maxlength="12">' +

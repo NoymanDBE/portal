@@ -405,6 +405,9 @@ details.shrow .savestar:hover,details.shrow .savestar.on{color:var(--warn)}
 .rchart .rcx{stroke:var(--text-2);stroke-width:1;stroke-dasharray:3 3}
 .rleg i.h{background:color-mix(in srgb,var(--warn) 60%,transparent)}.rleg i.c{background:var(--news)}
 .rleg .rhint{margin-left:auto;opacity:.7}
+.nearwhy{font-size:13.5px;line-height:1.5;color:var(--text-2);margin:14px 0 4px;text-wrap:pretty}
+.nearwhy b{color:var(--text-1);margin-right:6px}
+.schip2.sect{text-transform:capitalize}
 .callbox .cbw{grid-column:1/-1}
 .callbox .cbw b{font-size:13.5px;font-weight:600;line-height:1.4}
 .shstatus{margin-top:12px}
