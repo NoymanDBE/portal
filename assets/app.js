@@ -557,6 +557,7 @@ function stockRow(e, P) {
   var vlabel = { buy: 'BUY', wait: 'WAIT', refrain: 'REFRAIN' }[e.v] || esc(e.v || '');
   var sincePct = (e.since && e.since.px && q.last) ? ((q.last / e.since.px - 1) * 100) : null;
   var meta = '';
+  if (e.sector && e.sector !== 'etf') meta += '<span class="schip2 sect">' + esc(e.sector) + '</span>';
   if (e.cap) meta += '<span class="schip2 num">' + esc(e.cap) + '</span>';
   if (sincePct != null) meta += '<span class="schip2 num ' + (sincePct >= 0 ? 'upc' : 'dnc') + '">' +
     fpct(sincePct) + ' <i>since pick</i></span>';
@@ -655,6 +656,8 @@ function callBox(e, q) {
     '<div><span class="cb-l">Upside from here</span><b class="num ' + (up >= 0 ? 'upc' : 'dnc') + '">' + fpct(up) + '</b></div>' +
     (e.tgtH ? '<div><span class="cb-l">Horizon</span><b>' + esc(e.tgtH) + '</b></div>' : '') +
     (e.conf != null ? '<div><span class="cb-l">Conviction</span><b class="num">' + esc(e.conf) + '%</b></div>' : '') +
+    (e.dn != null && last ? '<div><span class="cb-l">If the thesis fails</span><b class="num dnc">$' + fnum(e.dn) + ' (' + fpct((e.dn / last - 1) * 100) + ')</b></div>' : '') +
+    (e.dn != null && last && last > e.dn && e.tgt > last ? '<div><span class="cb-l">Reward : risk</span><b class="num">' + ((e.tgt - last) / (last - e.dn)).toFixed(1) + ' : 1</b></div>' : '') +
     (since != null ? '<div><span class="cb-l">Since call ' + esc(e.since.d) + '</span><b class="num ' + (since >= 0 ? 'upc' : 'dnc') + '">' + fpct(since) + '</b></div>' : '') +
     boardAge(e) +
     '</div>';
