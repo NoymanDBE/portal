@@ -405,6 +405,10 @@ details.shrow .savestar:hover,details.shrow .savestar.on{color:var(--warn)}
 .rchart .rcx{stroke:var(--text-2);stroke-width:1;stroke-dasharray:3 3}
 .rleg i.h{background:color-mix(in srgb,var(--warn) 60%,transparent)}.rleg i.c{background:var(--news)}
 .rleg .rhint{margin-left:auto;opacity:.7}
+.triglist{margin:0;padding-left:20px;font-size:13.5px;line-height:1.5;color:var(--text-1)}
+.triglist li{margin-bottom:5px}
+.triglist li.fired{color:var(--text-1);font-weight:600}
+.triglist .tset{color:var(--text-3);font-size:11.5px}
 .nearwhy{font-size:13.5px;line-height:1.5;color:var(--text-2);margin:14px 0 4px;text-wrap:pretty}
 .nearwhy b{color:var(--text-1);margin-right:6px}
 .schip2.sect{text-transform:capitalize}

@@ -566,6 +566,8 @@ function stockRow(e, P) {
   if (e.tgt != null) meta += '<span class="schip2 tgtc num">TARGET $' + fnum(e.tgt) + (e.tgtPct != null ? ' (' + fpct(e.tgtPct) + ')' : '') + '</span>';
   if (e.conf != null) meta += '<span class="schip2 num">CONF ' + esc(e.conf) + '%</span>';
   if (e.chgTag) meta += '<span class="schip2 chg">' + esc(e.chgTag) + '</span>';
+  if ((e.trig || []).some(function (x) { return x.fired; })) meta += '<span class="fchip2 good">TRIGGER FIRED</span>';
+  else if ((e.trig || []).length) meta += '<span class="schip2 num">' + e.trig.length + ' re-look trigger' + (e.trig.length > 1 ? 's' : '') + '</span>';
 
   var inPort = portSet(state.content.stocks || { port: [] }).indexOf(e.t) >= 0;
   var body = '<div class="sact">' + (inPort ?
@@ -615,6 +617,13 @@ function stockRow(e, P) {
       e.watch.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
   }
   if (e.drop_reason) body += '<div class="nlabel dis">WHY IT IS NOT A BUY</div><div class="dispbox"><p>' + esc(e.drop_reason) + '</p></div>';
+  if ((e.trig || []).length) {
+    body += '<div class="nlabel">RE-LOOK TRIGGERS — CHECKED FOUR TIMES A DAY</div><ul class="triglist">' + e.trig.map(function (x) {
+      var what = x.cond === 'on' ? 'on ' + esc(x.date) : 'close ' + esc(x.cond) + ' $' + fnum(x.px);
+      return '<li class="' + (x.fired ? 'fired' : '') + '"><b class="num">' + what + '</b>' + (x.fired ? ' <span class="fchip2 good">FIRED ' + esc(x.fired.d) + '</span>' : '') +
+        ' — ' + esc(x.why) + ' <span class="num tset">(set ' + esc(x.set) + ')</span></li>';
+    }).join('') + '</ul>';
+  }
   if (e.note) body += '<p class="snote">' + esc(e.note) + '</p>';
 
   return '<details class="srow v-' + esc(e.v || '') + '">' +

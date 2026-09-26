@@ -72,6 +72,14 @@ else:
 
 scan = [c for c in C if c.get("t") not in PORT]
 tally = {v: sum(1 for c in scan if c.get("v") == v) for v in ("buy", "wait", "refrain")}
+# re-look triggers ride on their company's entry (live + fired-but-not-yet-acted-on)
+_trig = [x for x in (_st.get("TRIGGERS", []) if STATE_MODE else []) if not x.get("ack")]
+for c in C:
+    mine = [x for x in _trig if x.get("t") == c.get("t")]
+    if mine:
+        c["trig"] = mine
+    else:
+        c.pop("trig", None)
 
 stocks = {
     "built": built, "kicker": kicker, "h1": h1, "dateline": dateline,
