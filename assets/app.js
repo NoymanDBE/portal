@@ -812,7 +812,7 @@ function stocksHTML(s, sub) {
   }
   if (sub === '') {
     if ((s.gist || []).length) {
-      body += '<div class="nlabel">THIS MORNING, BRIEFLY</div><ul class="keypts">' +
+      body += '<div class="nlabel">WHAT MATTERS THIS WEEK</div><ul class="keypts">' +
         s.gist.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') + '</ul>';
     }
     if (s.picks) { body += picksHTML(s, byT); }
