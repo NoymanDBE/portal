@@ -81,7 +81,31 @@ for c in C:
     else:
         c.pop("trig", None)
 
+# THE MORNING SIX (Dror, 03-10-2026): exactly 3 Buy, 1 Bonanza, 2 To watch; at most one medical name.
+PICKS = _st.get("PICKS") if STATE_MODE else None
+if PICKS:
+    byT = {c.get("t"): c for c in C}
+    six = list(PICKS.get("buy", [])) + list(PICKS.get("bonanza", [])) + list(PICKS.get("watch", []))
+    problems = []
+    if (len(PICKS.get("buy", [])), len(PICKS.get("bonanza", [])), len(PICKS.get("watch", []))) != (3, 1, 2):
+        problems.append(f"need 3/1/2, have {len(PICKS.get('buy', []))}/{len(PICKS.get('bonanza', []))}/{len(PICKS.get('watch', []))}")
+    if len(set(six)) != len(six): problems.append("a ticker appears twice")
+    missing = [t for t in six if t not in byT or t not in P]
+    if missing: problems.append(f"no C/P entry for {missing}")
+    med = [t for t in six if (byT.get(t) or {}).get("sector") in ("biopharma", "medtech/diagnostics")]
+    if len(med) > 1: problems.append(f"more than one medical name: {med}")
+    for slot in ("buy", "bonanza", "watch"):
+        for t in PICKS.get(slot, []):
+            e = byT.get(t) or {}
+            if e.get("v") != slot: problems.append(f"{t}: v={e.get('v')} but slot {slot}")
+            lead = e.get("lead") or ""
+            if not lead or len(lead.split()) > 90: problems.append(f"{t}: lead missing or over 90 words")
+            if t in ASIDE: problems.append(f"{t} is a pick but sits in ASIDE")
+    if problems:
+        sys.exit("PICKS GATE FAILED: " + "; ".join(problems))
+
 stocks = {
+    "picks": PICKS,
     "built": built, "kicker": kicker, "h1": h1, "dateline": dateline,
     "gist": gist, "tally": tally,
     "strip": STRIP, "port": PORT, "aside": ASIDE,

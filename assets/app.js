@@ -555,7 +555,7 @@ function kLeave(svg) {
 }
 function stockRow(e, P) {
   var q = (P || {})[e.t] || {};
-  var vlabel = { buy: 'BUY', wait: 'WAIT', refrain: 'REFRAIN' }[e.v] || esc(e.v || '');
+  var vlabel = { buy: 'BUY', bonanza: 'BONANZA', watch: 'TO WATCH', wait: 'WAIT', refrain: 'REFRAIN' }[e.v] || esc(e.v || '');
   var sincePct = (e.since && e.since.px && q.last) ? ((q.last / e.since.px - 1) * 100) : null;
   var meta = '';
   if (e.sector && e.sector !== 'etf') meta += '<span class="schip2 sect">' + esc(e.sector) + '</span>';
@@ -575,6 +575,7 @@ function stockRow(e, P) {
       '<button type="button" class="addbtn" data-portadd-t="' + esc(e.t) + '">+ Add to portfolio</button>') +
     '<button type="button" class="addbtn' + (watchList().indexOf(e.t) >= 0 ? ' on' : '') + '" data-w="' + esc(e.t) + '">' + (watchList().indexOf(e.t) >= 0 ? '\u2605 Watching' : '\u2606 Watch') + '</button></div>' +
     callBox(e, q) + candleSVG(e.t, q);
+  if (e.lead) return rowShell(e, q, meta, vlabel, body + shortBody(e, q));
   if (e.does) body += '<div class="nlabel">WHAT IT DOES</div><p>' + esc(e.does) + '</p>';
   if (e.edge) body += '<div class="nlabel">THE EDGE</div><p>' + esc(e.edge) + '</p>';
   if (e.why) body += '<div class="nlabel">WHY NOW</div><p>' + esc(e.why) + '</p>';
@@ -626,6 +627,9 @@ function stockRow(e, P) {
   }
   if (e.note) body += '<p class="snote">' + esc(e.note) + '</p>';
 
+  return rowShell(e, q, meta, vlabel, body);
+}
+function rowShell(e, q, meta, vlabel, body) {
   return '<details class="srow v-' + esc(e.v || '') + '">' +
     '<summary><div class="sr-head">' +
     '<span class="sr-tick num">' + esc(e.t) + '</span>' +
@@ -636,9 +640,35 @@ function stockRow(e, P) {
     chgPill(q.chg1d) +
     '<button type="button" class="wstar' + (watchList().indexOf(e.t) >= 0 ? ' on' : '') + '" data-w="' + esc(e.t) + '" aria-label="Watch" title="' + (watchList().indexOf(e.t) >= 0 ? 'Remove from watchlist' : 'Add to watchlist') + '">' + (watchList().indexOf(e.t) >= 0 ? '★' : '☆') + '</button></div>' +
     '<div class="sr-meta">' + meta + '</div>' +
-    (e.gist ? '<div class="sr-gist">' + esc(e.gist) + '</div>' : '') +
+    (e.lead ? '<p class="sr-lead">' + esc(e.lead) + '</p>' : (e.gist ? '<div class="sr-gist">' + esc(e.gist) + '</div>' : '')) +
     '</summary><div class="nbody">' + body + '</div></details>';
 }
+function shortBody(e, q) {
+  var b = '';
+  function sec(label, txt, cls) { return txt ? '<div class="nlabel' + (cls || '') + '">' + label + '</div><p class="shortp">' + esc(txt) + '</p>' : ''; }
+  b += sec('WHY NOW', e.why) + sec('THE CASE', e['case']) + sec('WHAT COULD GO WRONG', e.risk, ' dis');
+  if ((e.ev || []).length && Array.isArray(e.ev)) b += '<div class="nlabel">THE EVIDENCE</div><ul class="evlist">' + e.ev.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+  if (e.ta || e.fund) b += '<div class="nlabel">TAPE AND BOOKS</div><ul class="evlist">' + (e.ta ? '<li><b>Tape:</b> ' + esc(e.ta) + '</li>' : '') + (e.fund ? '<li><b>Books:</b> ' + esc(e.fund) + '</li>' : '') + '</ul>';
+  if (e.feas && e.feas.txt) b += '<div class="nlabel">DOES THE TECHNOLOGY WORK?</div><p class="shortp"><b class="num">' + esc(e.feas.p) + '%</b> ' + esc(e.feas.txt) + '</p>';
+  if ((e.sn || []).length) {
+    b += '<div class="nlabel">SCENARIOS</div><div class="snbox">' + e.sn.map(function (x) {
+      return '<div class="snrow"><span class="snp num">' + Math.round((x[2] || 0) * 100) + '%</span>' +
+        '<span class="snl">' + esc(x[0]) + '<span class="snbar"><span style="width:' + Math.round((x[2] || 0) * 100) + '%"></span></span></span>' +
+        '<span class="snv num">$' + fnum(x[1]) + '</span></div>';
+    }).join('') + '</div>';
+  }
+  if ((e.stats || []).length) b += '<div class="nlabel">THE NUMBERS</div><dl class="statgrid">' + e.stats.map(function (x) { return '<div><dt>' + esc(x[0]) + '</dt><dd class="num">' + esc(x[1]) + '</dd></div>'; }).join('') + '</dl>';
+  if ((e.watch || []).length) b += '<div class="nlabel">WATCHING</div><ul class="evlist">' + e.watch.map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul>';
+  if (e.drop_reason && e.v !== 'buy' && e.v !== 'bonanza' && e.v !== 'watch') b += sec('WHY IT IS NOT A PICK', e.drop_reason, ' dis');
+  if ((e.trig || []).length) {
+    b += '<div class="nlabel">TRIGGERS — CHECKED FOUR TIMES A DAY</div><ul class="triglist">' + e.trig.map(function (x) {
+      var what = x.cond === 'on' ? 'on ' + esc(x.date) : 'close ' + esc(x.cond) + ' $' + fnum(x.px);
+      return '<li class="' + (x.fired ? 'fired' : '') + '"><b class="num">' + what + '</b>' + (x.fired ? ' <span class="fchip2 good">FIRED ' + esc(x.fired.d) + '</span>' : '') + ' — ' + esc(x.why) + '</li>';
+    }).join('') + '</ul>';
+  }
+  return b;
+}
+function isMedical(e) { return e && (e.sector === 'biopharma' || e.sector === 'medtech/diagnostics'); }
 var REPO_ISSUES = 'https://github.com/NoymanDBE/portal/issues/new';
 function lsGet(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -660,6 +690,24 @@ function issueLink(kind, t) {
 function callBox(e, q) {
   if (e.tgt == null) return '';
   var last = (q || {}).last, up = (last && e.tgt) ? (e.tgt / last - 1) * 100 : e.tgtPct;
+  if (e.v === 'bonanza' && e.bull) {
+    return '<div class="callbox bonz">' +
+      '<div><span class="cb-l">If it works</span><b class="num upc">$' + fnum(e.bull) + (last ? ' (' + (e.bull / last).toFixed(1) + '\u00d7)' : '') + '</b></div>' +
+      (e.p_bull != null ? '<div><span class="cb-l">Chance of that</span><b class="num">' + esc(e.p_bull) + '%</b></div>' : '') +
+      (e.dn != null && last ? '<div><span class="cb-l">If it fails</span><b class="num dnc">$' + fnum(e.dn) + ' (' + fpct((e.dn / last - 1) * 100) + ')</b></div>' : '') +
+      '<div><span class="cb-l">Base-case target</span><b class="num">$' + fnum(e.tgt) + ' (' + fpct(up) + ')</b></div>' +
+      (e.tgtH ? '<div><span class="cb-l">Horizon</span><b>' + esc(e.tgtH) + '</b></div>' : '') +
+      '<div class="cbw"><span class="cb-l">How to treat it</span><b>A long shot: size it so losing most of it would not hurt.</b></div></div>';
+  }
+  if (e.v === 'watch') {
+    var tg = (e.trig || [])[0];
+    var when = tg ? (tg.cond === 'on' ? 'on ' + esc(tg.date) : 'a close ' + esc(tg.cond) + ' $' + fnum(tg.px)) : '';
+    return '<div class="callbox">' +
+      (when ? '<div class="cbw"><span class="cb-l">Becomes a Buy</span><b>' + when + (tg.why ? ' — ' + esc(tg.why) : '') + '</b></div>' : '') +
+      '<div><span class="cb-l">Target if it does</span><b class="num">$' + fnum(e.tgt) + '</b></div>' +
+      (e.conf != null ? '<div><span class="cb-l">Conviction today</span><b class="num">' + esc(e.conf) + '%</b></div>' : '') +
+      (e.dn != null && last ? '<div><span class="cb-l">If the thesis fails</span><b class="num dnc">$' + fnum(e.dn) + '</b></div>' : '') + '</div>';
+  }
   var since = (e.since && e.since.px && last) ? (last / e.since.px - 1) * 100 : null;
   return '<div class="callbox">' +
     '<div><span class="cb-l">Price target</span><b class="num">$' + fnum(e.tgt) + '</b></div>' +
@@ -713,8 +761,9 @@ function stocksSubtabs(s, sub) {
       (cnt != null ? ' <span class="num">' + cnt + '</span>' : '') + '</a>';
   }
   var board = scan.filter(function (c) { return c.v === 'buy' && s.aside.indexOf(c.t) < 0; });
-  return '<nav class="subtabs">' + tab('', 'Buy board', board.length) +
-    tab('portfolio', 'My Portfolio', portSet(s).length) + tab('watch', '★ Watchlist', watchList().length) +
+  var nPicks = s.picks ? [].concat(s.picks.buy || [], s.picks.bonanza || [], s.picks.watch || []).length : board.length;
+  return '<nav class="subtabs">' + tab('', s.picks ? 'Today\u2019s picks' : 'Buy board', nPicks) +
+    tab('portfolio', 'My Portfolio', portSet(s).length) + tab('watch', '\u2605 My watchlist', watchList().length) +
     tab('dropped', 'Dropped', s.aside.length) + tab('record', 'Record', (s.ledger || []).length) + '</nav>';
 }
 function stripHTML(s) {
@@ -726,6 +775,19 @@ function stripHTML(s) {
       '<span class="mtc num ' + (q.chg1d >= 0 ? 'upc' : 'dnc') + '">' + fpct(q.chg1d) + '</span></div>';
   }).join('');
   return tiles ? '<div class="mstrip2">' + tiles + '</div>' : '';
+}
+function picksHTML(s, byT) {
+  var pk = s.picks, out = '';
+  var groups = [['buy', 'BUY', 'The three best risk-reward names today.'],
+                ['bonanza', 'BONANZA', 'One high-risk, high-reward shot \u2014 small money only.'],
+                ['watch', 'TO WATCH', 'One step away from a Buy \u2014 the trigger is on each row.']];
+  groups.forEach(function (g) {
+    var list = (pk[g[0]] || []).map(function (t) { return byT[t]; }).filter(Boolean);
+    out += '<div class="ngroup pkg pk-' + g[0] + '"><span>' + g[1] + ' \u00b7 ' + list.length + '</span></div><p class="pkhint">' + g[2] + '</p>' +
+      '<div class="picklist pl-' + g[0] + '">' + list.map(function (e) { return stockRow(e, s.P); }).join('') + '</div>';
+  });
+  if (pk.d) out += '<p class="pkdate">Picks set ' + esc(pk.d) + '. Each one is re-earned every morning.</p>';
+  return out;
 }
 function nearMisses(s, byT) {
   return (s.aside || []).map(function (t) { return byT[t]; })
@@ -752,6 +814,8 @@ function stocksHTML(s, sub) {
       body += '<div class="nlabel">THIS MORNING, BRIEFLY</div><ul class="keypts">' +
         s.gist.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') + '</ul>';
     }
+    if (s.picks) { body += picksHTML(s, byT); }
+    else {
     var board = scan.filter(function (c) { return c.v === 'buy' && s.aside.indexOf(c.t) < 0; });
     body += '<div class="ngroup"><span>BUY · ' + board.length + '</span></div>' +
       (board.length ? '<div class="boardlist">' + rows(board) + '</div>' :
@@ -761,6 +825,7 @@ function stocksHTML(s, sub) {
       '<div class="nearlist">' + near.map(function (e) {
         return '<p class="nearwhy"><b class="num">' + esc(e.t) + '</b> ' + esc(e.drop_reason) + '</p>' + stockRow(e, s.P);
       }).join('') + '</div>';
+    }
   } else if (sub === 'portfolio') {
     var pset = portSet(s);
     body += '<form class="portadd" autocomplete="off"><input id="port-q" name="q" list="tick-list" placeholder="Add a ticker \u2014 e.g. NVDA" maxlength="12">' +
@@ -791,7 +856,8 @@ function stocksHTML(s, sub) {
   return '<article class="paper stocks"><div class="edline">' + esc((s.kicker || '').toUpperCase()) +
     (s.built ? ' · UPDATED ' + esc(s.built) : '') + '</div>' +
     '<div class="tallyrow">' +
-    '<span class="tly buy num">' + s.C.filter(function (c) { return c.v === 'buy' && s.port.indexOf(c.t) < 0 && s.aside.indexOf(c.t) < 0; }).length + ' BUY</span>' +
+    (s.picks ? '<span class="tly buy num">' + (s.picks.buy || []).length + ' BUY \u00b7 ' + (s.picks.bonanza || []).length + ' BONANZA \u00b7 ' + (s.picks.watch || []).length + ' TO WATCH</span>' :
+    '<span class="tly buy num">' + s.C.filter(function (c) { return c.v === 'buy' && s.port.indexOf(c.t) < 0 && s.aside.indexOf(c.t) < 0; }).length + ' BUY</span>') +
     '<span class="tly refrain num">' + (s.aside || []).length + ' DROPPED</span>' +
     '<span class="tly wait num">' + (s.ledger || []).length + ' CALLS ON RECORD</span></div>' +
     (s.dateline ? '<p class="scandate">' + esc(s.dateline) + '</p>' : '') +

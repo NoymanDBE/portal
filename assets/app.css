@@ -191,6 +191,16 @@ details.srow[open]>summary{border-bottom:1px solid var(--hair)}
 .schip2.dnc{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
 .schip2.chg{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent);font-weight:700}
 .sr-gist{font:400 14.5px/1.55 var(--serif);color:var(--text-body);margin-top:9px;max-width:76ch}
+.sr-lead{font:400 15px/1.55 var(--serif);color:var(--text-body);margin:9px 0 0;max-width:72ch;text-wrap:pretty}
+.vpill.bonanza{color:#B65CFF;border-color:color-mix(in srgb,#B65CFF 55%,transparent);background:color-mix(in srgb,#B65CFF 10%,transparent)}
+.vpill.watch{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.pkhint{font-size:13px;color:var(--text-2);margin:-4px 0 6px}
+.pkdate{font-size:12.5px;color:var(--text-3);margin-top:14px}
+.pk-bonanza span{color:#B65CFF}
+.shortp{margin:0;font-size:15px;line-height:1.55;text-wrap:pretty;max-width:72ch}
+.evlist{margin:0;padding-left:20px;font-size:14px;line-height:1.5;color:var(--text-1)}
+.evlist li{margin-bottom:4px}
+.callbox.bonz{border-color:color-mix(in srgb,#B65CFF 45%,var(--hair))}
 .snbox{display:flex;flex-direction:column;gap:8px;margin-top:4px}
 .snrow{display:grid;grid-template-columns:44px 1fr 74px;gap:10px;align-items:center;font-size:13.5px}
 .snp{font-weight:700;color:var(--text-2)}
