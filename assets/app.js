@@ -566,6 +566,7 @@ function stockRow(e, P) {
   if (e.tgt != null) meta += '<span class="schip2 tgtc num">TARGET $' + fnum(e.tgt) + (e.tgtPct != null ? ' (' + fpct(e.tgtPct) + ')' : '') + '</span>';
   if (e.conf != null) meta += '<span class="schip2 num">CONF ' + esc(e.conf) + '%</span>';
   if (e.chgTag) meta += '<span class="schip2 chg">' + esc(e.chgTag) + '</span>';
+  if (e.below_bar) meta += '<span class="fchip2 warn" title="Best available today, but it does not clear the full gate (conviction 60+, reward-to-risk 2:1)">BELOW THE BAR</span>';
   if ((e.trig || []).some(function (x) { return x.fired; })) meta += '<span class="fchip2 good">TRIGGER FIRED</span>';
   else if ((e.trig || []).length) meta += '<span class="schip2 num">' + e.trig.length + ' re-look trigger' + (e.trig.length > 1 ? 's' : '') + '</span>';
 
