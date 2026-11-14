@@ -114,7 +114,7 @@ function tryUnlock(jwkText, fromStore) {
       state.key = key;
       return fetchManifest();
     })
-    .then(function (m) { state.manifest = m; return loadBlob('news'); })
+    .then(function (m) { state.manifest = m; return loadBlob('stocks'); })
     .then(function () {
       if (!fromStore) { kvSet('pk', imported); $('key-input').value = ''; }
       enter();
@@ -133,7 +133,7 @@ function tryStoredKey() {
     if (!key) { showGate(); return; }
     state.key = key;
     return fetchManifest()
-      .then(function (m) { state.manifest = m; return loadBlob('news'); })
+      .then(function (m) { state.manifest = m; return loadBlob('stocks'); })
       .then(enter)
       .catch(function (e) {
         if (e && e.step === 'manifest') { showGate(); gateError(e); return; }
@@ -144,11 +144,11 @@ function tryStoredKey() {
 }
 
 /* ---------- views ---------- */
-var NAMES = { news: "Dror's Morning News", stocks: "Dror's Stock Screener", shopping: "Dror's Shopping Scout" };
+var NAMES = { stocks: "Dror's Stock Screener" };
 function parseRoute() {
-  var parts = (location.hash.replace(/^#\/?/, '') || 'news').split('/');
-  var r = parts[0] || 'news';
-  if (!NAMES[r]) r = 'news';
+  var parts = (location.hash.replace(/^#\/?/, '') || 'stocks').split('/');
+  var r = parts[0] || 'stocks';
+  if (!NAMES[r]) r = 'stocks';
   return { r: r, sub: parts.slice(1).join('/') };
 }
 function route() {
@@ -811,7 +811,12 @@ function stocksHTML(s, sub) {
     return '<div class="ngroup"><span>' + label + ' · ' + list.length + '</span></div>' + rows(list);
   }
   if (sub === '') {
-    if ((s.gist || []).length) {
+    var db = s.debrief;
+    if (db && ((db.past || []).length || (db.ahead || []).length || db.mood)) {
+      var dl = function (label, arr) { return (arr || []).length ? '<div class="dbk"><span class="dbl">' + label + '</span><ul>' + arr.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></div>' : ''; };
+      body += '<div class="nlabel">THE WEEK IN MARKETS</div><div class="debrief">' + dl('LAST WEEK', db.past) + dl('THIS WEEK', db.ahead) +
+        (db.mood ? '<div class="dbk"><span class="dbl">MOOD</span><p>' + esc(db.mood) + '</p></div>' : '') + '</div>';
+    } else if ((s.gist || []).length) {
       body += '<div class="nlabel">WHAT MATTERS THIS WEEK</div><ul class="keypts">' +
         s.gist.map(function (g) { return '<li>' + esc(g) + '</li>'; }).join('') + '</ul>';
     }

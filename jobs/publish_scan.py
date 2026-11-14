@@ -112,6 +112,7 @@ stocks = {
     "C": C, "P": P,
     "ledger": (_st.get("LEDGER", []) if STATE_MODE else []),
     "lessons": (_st.get("LESSONS", []) if STATE_MODE else []),
+    "debrief": (_st.get("DEBRIEF") if STATE_MODE else None),
 }
 
 os.makedirs(os.path.join(ROOT, "data", today), exist_ok=True)
@@ -127,6 +128,9 @@ manifest = json.load(open(mpath, encoding="utf-8")) if os.path.exists(mpath) els
 manifest["date"] = today
 manifest["generated_at"] = now
 manifest["files"]["stocks"] = f"data/{today}/stocks.enc"
+for _gone in ("news", "shopping", "home"):          # News and the deals hunter were retired 14-11-2026
+    manifest["files"].pop(_gone, None)
+    manifest.get("content", {}).pop(_gone, None)
 _bd = re.match(r"(\d\d)/(\d\d)/(\d{4})", str(built or ""))
 manifest.setdefault("content", {})["stocks"] = f"{_bd.group(3)}-{_bd.group(2)}-{_bd.group(1)}" if _bd else today
 with open(mpath, "w", encoding="utf-8") as f:
